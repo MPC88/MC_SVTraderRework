@@ -16,7 +16,7 @@ namespace MC_SVTraderItemReserve
         public const string pluginVersion = "0.0.1";
 
         // Mod
-        private static int lockingTraderID = -1;
+        private static int curTraderID = -1;
         private static List<ReserveEntry> reservedList = new List<ReserveEntry>();
 
         // Debug
@@ -45,20 +45,12 @@ namespace MC_SVTraderItemReserve
         [HarmonyPrefix]
         private static bool DynCharDetermineItemToBuy_Pre(DynamicCharacter __instance)
         {
-            if(lockingTraderID == -1)
-            {
-                lockingTraderID = __instance.id;
-                if (cfgDebugLockState.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ")" + " locking searches.");
+            curTraderID = __instance.id;
+            if (cfgDebugLockState.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ")" + " locking searches.");
 
-                ClearReservations(__instance, "LookingForNewItem");
+            ClearReservations(__instance, "LookingForNewItem");
 
-                return true;
-            }
-            else
-            {
-                if (cfgDebug.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ")" + " blocked from search by trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == lockingTraderID).name + " (" + lockingTraderID + ")");
-                return false;
-            }
+            return true;
         }
 
         [HarmonyPatch(typeof(AITraderControl), "SetNewDestination")]
@@ -90,68 +82,53 @@ namespace MC_SVTraderItemReserve
                 {
                     if (__instance.dynChar.wantsToBuyItem == null)
                     {
-                        // Check for lock
-                        if (lockingTraderID == -1)
-                        {   
-                            lockingTraderID = __instance.dynChar.id;
-                            if (cfgDebugLockState.Value) log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + ")" + " locking searches.");
-
+                        lock (GameData.threadSaveLock)
+                        {
+                            curTraderID = __instance.dynChar.id;
                             ClearReservations(__instance.dynChar, "LookingForNewItem");
 
                             __instance.dynChar.wantsToBuyItem = currentSector.MarketPriceControl().GetRandomItemToBuy(__instance.dynChar.CommerceLevel, 5);
                         }
-                        else
-                        {
-                            if (cfgDebug.Value) log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + ")" + " blocked from search by trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == lockingTraderID).name + " (" + lockingTraderID + ")");
-                        }
                     }
                     if (__instance.dynChar.wantsToBuyItem != null)
                     {
-                        if (lockingTraderID != -1 && lockingTraderID != __instance.dynChar.id && cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader update blocked and waiting.");
-                        while (lockingTraderID != -1 && lockingTraderID != __instance.dynChar.id)
-                            System.Threading.Thread.Sleep(100);
+                        lock (GameData.threadSaveLock)
+                        { 
+                            ReserveEntry reserveEntry = reservedList.Find(re => re.traderID == __instance.dynChar.id);
 
-                        if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader:" + __instance.dynChar.id + " update locking searches.");
-                        int curLock = lockingTraderID;
-                        lockingTraderID = __instance.dynChar.id;
-
-                        ReserveEntry reserveEntry = reservedList.Find(re => re.traderID == __instance.dynChar.id);
-
-                        if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader:" + __instance.dynChar.id + " update returning lock to previous: " + curLock);
-                        lockingTraderID = curLock;
-
-                        if (reserveEntry != null)
-                        {
-                            if (currentSector.Index != reserveEntry.sectorIndex)
+                            if (reserveEntry != null)
                             {
-                                TSector targetSector = GameData.data.sectors[reserveEntry.sectorIndex];
-                                if (targetSector.IsBeingAttacked)
+                                if (currentSector.Index != reserveEntry.sectorIndex)
                                 {
-                                    __instance.dynChar.ClearWishlist();
-                                    return false;
-                                }
-
-                                TSector nextSector = null;
-                                if (targetSector.DistanceToPositionInGalaxy(currentSector.posV2) <= __instance.dynChar.MaxWarpDistance)
-                                    nextSector = targetSector;
-                                else
-                                {
-                                    float warpAdjust = 0.05f;
-                                    do
+                                    TSector targetSector = GameData.data.sectors[reserveEntry.sectorIndex];
+                                    if (targetSector.IsBeingAttacked)
                                     {
-                                        nextSector = GetClosestSectorToTargetInWarpRange(currentSector, targetSector, Mathf.RoundToInt(__instance.dynChar.MaxWarpDistance * (1 + warpAdjust)));
-                                        warpAdjust += 0.05f;
+                                        __instance.dynChar.ClearWishlist();
+                                        return false;
                                     }
-                                    while (nextSector == null);
 
-                                    if (cfgDebug.Value) log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + ")" + " jumping to: " + nextSector.coords + " warp cheat: +" + warpAdjust + "%");
-                                }
+                                    TSector nextSector = null;
+                                    if (targetSector.DistanceToPositionInGalaxy(currentSector.posV2) <= __instance.dynChar.MaxWarpDistance)
+                                        nextSector = targetSector;
+                                    else
+                                    {
+                                        float warpAdjust = 0.05f;
+                                        do
+                                        {
+                                            nextSector = GetClosestSectorToTargetInWarpRange(currentSector, targetSector, Mathf.RoundToInt(__instance.dynChar.MaxWarpDistance * (1 + warpAdjust)));
+                                            warpAdjust += 0.05f;
+                                        }
+                                        while (nextSector == null);
 
-                                if(nextSector != null)
-                                {
-                                    __instance.WarpDisappear(true);
-                                    __instance.dynChar.GoToSector(nextSector);
-                                    return false;
+                                        if (cfgDebug.Value) log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + ")" + " jumping to: " + nextSector.coords + " warp cheat: +" + warpAdjust + "%");
+                                    }
+
+                                    if (nextSector != null)
+                                    {
+                                        __instance.WarpDisappear(true);
+                                        __instance.dynChar.GoToSector(nextSector);
+                                        return false;
+                                    }
                                 }
                             }
                         }
@@ -218,14 +195,6 @@ namespace MC_SVTraderItemReserve
 
         private static void ClearReservations(DynamicCharacter dynChar, string cause)
         {
-            if (lockingTraderID != -1 && lockingTraderID != dynChar.id && cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Remove blocked and waiting.");
-            while (lockingTraderID != -1 && lockingTraderID != dynChar.id)
-                System.Threading.Thread.Sleep(100);
-
-            int curLockingID = lockingTraderID;
-            lockingTraderID = -2;
-            if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Remove locking searches.");
-
             if (cfgDebug.Value)
             {
                 List<ReserveEntry> remove = new List<ReserveEntry>();
@@ -243,38 +212,13 @@ namespace MC_SVTraderItemReserve
             {
                 reservedList.RemoveAll(re => re.traderID == dynChar.id);
             }
-
-            if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Remove returning lock to previous: " + curLockingID);
-            lockingTraderID = curLockingID;
-        }
-
-        [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.DetermineItemToBuy))]
-        [HarmonyPostfix]
-        private static void DynCharDetermineItemToBuy_Post(DynamicCharacter __instance)
-        {
-            if(lockingTraderID == __instance.id)
-            {
-                if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ")" + " lifting lock.");
-                lockingTraderID = -1;
-            }
-        }
-
-        [HarmonyPatch(typeof(AITraderControl), "SetNewDestination")]
-        [HarmonyPostfix]
-        private static void AITCSetNewDestination(AITraderControl __instance)
-        {
-            if (lockingTraderID == __instance.dynChar.id)
-            {
-                if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + ")" + " lifting lock.");
-                lockingTraderID = -1;
-            }
         }
 
         [HarmonyPatch(typeof(MarketPriceControl), nameof(MarketPriceControl.GetRandomItemOffer))]
         [HarmonyPostfix]
         private static void MPCGetRandomItemOffer_Post(MarketPriceControl __instance, int minItemLvl, int maxItemLvl, ref Item __result)
         {
-            DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == lockingTraderID);
+            DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID);
 
             __instance.UpdatePricesList(forced: true);
 
@@ -299,7 +243,7 @@ namespace MC_SVTraderItemReserve
             if (__result == null)
                 return;
 
-            DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == lockingTraderID);
+            DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID);
 
             __instance.UpdatePricesList(forced: true);
 
@@ -374,8 +318,8 @@ namespace MC_SVTraderItemReserve
                 finalunitPrice = finalIMP.tradePrice == -1 ? GameData.data.GalacticMarket().GetItemPriceOnSector(finalItem.id, mpc.sector) : finalIMP.tradePrice;
             int maxQnt = Mathf.Clamp((int)(dynChar.credits / finalunitPrice), 0, (int)(dynChar.CargoSpace / finalItem.weight));
 
-            reservedList.Add(new ReserveEntry(lockingTraderID, mpc.sector.Index, finalItem.id, maxQnt));
-            if (cfgDebug.Value) log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == lockingTraderID).name + " (" + lockingTraderID + ")" + " reserving Item: " + ItemDB.GetItem(finalItem.id).itemName + " (" + finalItem.id + ")" + " Qnt: " + maxQnt + " in sector: " + mpc.sector.coords + ".  Reserved list count: " + reservedList.Count);
+            reservedList.Add(new ReserveEntry(curTraderID, mpc.sector.Index, finalItem.id, maxQnt));
+            if (cfgDebug.Value) log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID).name + " (" + curTraderID + ")" + " reserving Item: " + ItemDB.GetItem(finalItem.id).itemName + " (" + finalItem.id + ")" + " Qnt: " + maxQnt + " in sector: " + mpc.sector.coords + ".  Reserved list count: " + reservedList.Count);
             return finalItem;
         }
 
@@ -383,14 +327,20 @@ namespace MC_SVTraderItemReserve
         [HarmonyPostfix]
         private static void StationSellToNPC_Post(DynamicCharacter NPCChar)
         {
-            ClearReservations(NPCChar, "BoughtItems");
+            lock (GameData.threadSaveLock)
+            {
+                ClearReservations(NPCChar, "BoughtItems");
+            }
         }
 
         [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.ClearWishlist))]
         [HarmonyPostfix]
         private static void DynamicCharacterClearWishlist_Post(DynamicCharacter __instance)
         {
-            ClearReservations(__instance, "WishlistClear");
+            lock (GameData.threadSaveLock)
+            {
+                ClearReservations(__instance, "WishlistClear");
+            }
         }
 
         [HarmonyPatch(typeof(CharacterSystem), nameof(CharacterSystem.UpdateCharacters))]
@@ -475,18 +425,7 @@ namespace MC_SVTraderItemReserve
             }
             if (__instance.wantsToBuyItem != null)
             {
-                if (lockingTraderID != -1 && lockingTraderID != __instance.id && cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader update blocked and waiting.");
-                while (lockingTraderID != -1 && lockingTraderID != __instance.id)
-                    System.Threading.Thread.Sleep(100);
-
-                if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader:" + __instance.id + " update locking searches.");
-                int curLock = lockingTraderID;
-                lockingTraderID = __instance.id;
-
                 ReserveEntry reserveEntry = reservedList.Find(re => re.traderID == __instance.id);
-
-                if (cfgDebug.Value && cfgDebugLockState.Value) log.LogInfo("Trader:" + __instance.id + " update returning lock to previous: " + curLock);
-                lockingTraderID = curLock;
 
                 if (reserveEntry != null)
                 {                    
