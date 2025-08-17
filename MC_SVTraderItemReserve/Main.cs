@@ -1,9 +1,13 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
+using BepInEx.Logging;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Purchasing;
+using static System.Collections.Specialized.BitVector32;
 
 namespace MC_SVTraderItemReserve
 {
@@ -170,7 +174,7 @@ namespace MC_SVTraderItemReserve
             }
             if (__instance.currStatus == 2)
             {
-                if (Random.Range(1, 11) < 6)
+                if (UnityEngine.Random.Range(1, 11) < 6)
                 {
                     AIStationControl randomJumpgateStation2 = GameManager.instance.GetRandomJumpgateStation(allowLocalJump: false);
                     if (randomJumpgateStation2 != null)
@@ -214,26 +218,84 @@ namespace MC_SVTraderItemReserve
             }
         }
 
-        [HarmonyPatch(typeof(MarketPriceControl), nameof(MarketPriceControl.GetRandomItemOffer))]
-        [HarmonyPostfix]
-        private static void MPCGetRandomItemOffer_Post(MarketPriceControl __instance, int minItemLvl, int maxItemLvl, ref Item __result)
+        [HarmonyPatch(typeof(GameDataInfo), nameof(GameDataInfo.GetRandomItemOfferOnNearbySectors))]
+        [HarmonyPrefix]
+        private static bool GDIGetRandomItemOffer_Pre(GameDataInfo __instance, ref Item __result, int commerceLevel, float maxRange, TSector fromSector, int maxSectorLevel, System.Random rand)
+        {
+            if (rand == null)
+                rand = new System.Random();
+
+            Tuple<ItemMarketPrice, int> finalResult = null;
+            int maxLvl = commerceLevel + 2;
+            int minLvl = Mathf.RoundToInt(maxLvl / 2);
+            while (finalResult == null && maxLvl <= maxSectorLevel)
+            {
+                List<TSector> list = __instance.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(fromSector.posV2) <= maxRange && s.MarketPriceControl().HasAnyItemOffer(minLvl - 2, maxLvl + 2));
+                List<Tuple<ItemMarketPrice, int>> bestItems = new List<Tuple<ItemMarketPrice, int>>();
+
+                if (list.Count > 0)
+                {
+                    foreach(TSector s in list)
+                    {
+                        Tuple<ItemMarketPrice, int> bestSectorItem = GetBestItemOffer(s.MarketPriceControl(), minLvl - 2, maxLvl + 2);
+                        if (bestSectorItem != null)
+                            bestItems.Add(bestSectorItem);
+                    }
+
+                    if (bestItems.Count > 0)
+                    {
+                        float finalUnitPrice = 0;
+                        foreach (Tuple<ItemMarketPrice, int> i in bestItems)
+                        {
+                            if (finalResult == null)
+                            {
+                                finalResult = i;
+                                finalUnitPrice = GetPrice(finalResult.Item1, finalResult.Item1.mpc.sector);
+                            }
+                            else
+                            {
+                                float iUnitPrice = GetPrice(i.Item1, i.Item1.mpc.sector);
+                                if ((iUnitPrice / i.Item1.AsItem.basePrice) < (finalUnitPrice / finalResult.Item1.AsItem.basePrice))
+                                {
+                                    finalResult = i;
+                                    finalUnitPrice = iUnitPrice;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (finalResult == null)
+                {
+                    minLvl = minLvl - 2 > 0 ? minLvl - 2 : 1;
+                    maxLvl += 2;
+                }
+            }
+
+            if (finalResult == null)
+            {
+                __result = null;
+                return false;
+            }
+
+            reservedList.Add(new ReserveEntry(curTraderID, finalResult.Item1.mpc.sector.Index, finalResult.Item1.AsItem.id, finalResult.Item2));
+            if (cfgDebug.Value) log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID).name + " (" + curTraderID + ")" + " reserving Item: " + ItemDB.GetItem(finalResult.Item1.AsItem.id).itemName + " (" + finalResult.Item1.AsItem.id + ")" + " Qnt: " + finalResult.Item2 + " in sector: " + finalResult.Item1.mpc.sector.coords + ".  Reserved list count: " + reservedList.Count);
+            __result = finalResult.Item1.AsItem;
+            return false;
+        }
+
+        private static Tuple<ItemMarketPrice, int> GetBestItemOffer(MarketPriceControl __instance, int minItemLvl, int maxItemLvl)
         {
             DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID);
 
-            __instance.UpdatePricesList(forced: true);
-
             List<ItemMarketPrice> newList = FilterMarketItemList(
-                ShuffleList(__instance.prices.FindAll((ItemMarketPrice p) => p.IsSelling && p.AsItem.itemLevel >= minItemLvl && p.AsItem.itemLevel <= maxItemLvl), __instance.rand), 
-                __instance.sector, 
+                __instance.prices.FindAll((ItemMarketPrice p) => p.IsSelling && p.AsItem.itemLevel >= minItemLvl && p.AsItem.itemLevel <= maxItemLvl),
+                __instance.sector,
                 dynChar);
 
             if (newList.Count <= 0)
-            {
-                __result = null;
-                return;
-            }
+                return null;
 
-            __result = GetFinalItemAndReserve(__instance, newList, dynChar);
+            return GetFinalItem(__instance, newList, dynChar);
         }
 
         [HarmonyPatch(typeof(MarketPriceControl), nameof(MarketPriceControl.GetRandomItemToBuy))]
@@ -244,8 +306,6 @@ namespace MC_SVTraderItemReserve
                 return;
 
             DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID);
-
-            __instance.UpdatePricesList(forced: true);
 
             List<ItemMarketPrice> newList = FilterMarketItemList(
                 (List<ItemMarketPrice>)AccessTools.Method(typeof(MarketPriceControl), "GetSellingPriceList").Invoke(__instance, new object[] { commerceLevel, true, 2, true }), 
@@ -261,7 +321,10 @@ namespace MC_SVTraderItemReserve
             if (randomness > newList.Count)
                 randomness = newList.Count;
 
-            __result = GetFinalItemAndReserve(__instance, newList, dynChar);
+            Tuple<ItemMarketPrice, int> finalResult = GetFinalItem(__instance, newList, dynChar);
+            reservedList.Add(new ReserveEntry(curTraderID, __instance.sector.Index, finalResult.Item1.AsItem.id, finalResult.Item2));
+            if (cfgDebug.Value) log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID).name + " (" + curTraderID + ")" + " reserving Item: " + ItemDB.GetItem(finalResult.Item1.AsItem.id).itemName + " (" + finalResult.Item1.AsItem.id + ")" + " Qnt: " + finalResult.Item2 + " in sector: " + __instance.sector.coords + ".  Reserved list count: " + reservedList.Count);
+            __result = finalResult.Item1.AsItem;
         }
 
         private static List<ItemMarketPrice> FilterMarketItemList(List<ItemMarketPrice> list, TSector sector, DynamicCharacter dynChar)
@@ -286,10 +349,7 @@ namespace MC_SVTraderItemReserve
                         {
                             int availableQnt = market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock - ReserveEntry.GetTotalReservedQuantity(reservedList, imp.itemID);
 
-                            unitPrice = imp.sellingPrice;
-                            if (unitPrice == -1)
-                                unitPrice = imp.tradePrice == -1 ? GameData.data.GalacticMarket().GetItemPriceOnSector(imp.itemID, sector) : imp.tradePrice;
-
+                            unitPrice = GetPrice(imp, sector);
                             int desiredQnt = Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight));
 
                             if (desiredQnt <= availableQnt)
@@ -308,19 +368,29 @@ namespace MC_SVTraderItemReserve
             return newList;
         }
 
-        private static Item GetFinalItemAndReserve(MarketPriceControl mpc, List<ItemMarketPrice> list, DynamicCharacter dynChar)
+        private static Tuple<ItemMarketPrice, int> GetFinalItem(MarketPriceControl mpc, List<ItemMarketPrice> list, DynamicCharacter dynChar)
         {
             ItemMarketPrice finalIMP = list[mpc.Rand.Next(0, list.Count)];
-            Item finalItem = finalIMP.AsItem;
+            float finalUnitPrice = GetPrice(finalIMP, mpc.sector);
 
-            float finalunitPrice = finalIMP.sellingPrice;
-            if (finalunitPrice == -1)
-                finalunitPrice = finalIMP.tradePrice == -1 ? GameData.data.GalacticMarket().GetItemPriceOnSector(finalItem.id, mpc.sector) : finalIMP.tradePrice;
-            int maxQnt = Mathf.Clamp((int)(dynChar.credits / finalunitPrice), 0, (int)(dynChar.CargoSpace / finalItem.weight));
+            foreach (ItemMarketPrice item in list)
+            {
+                float itemUnitPrice = GetPrice(item, mpc.sector);
+                if ((itemUnitPrice / item.AsItem.basePrice) < (finalUnitPrice / finalIMP.AsItem.basePrice))
+                {
+                    finalIMP = item;
+                    finalUnitPrice = itemUnitPrice;
+                }
+            }
 
-            reservedList.Add(new ReserveEntry(curTraderID, mpc.sector.Index, finalItem.id, maxQnt));
-            if (cfgDebug.Value) log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == curTraderID).name + " (" + curTraderID + ")" + " reserving Item: " + ItemDB.GetItem(finalItem.id).itemName + " (" + finalItem.id + ")" + " Qnt: " + maxQnt + " in sector: " + mpc.sector.coords + ".  Reserved list count: " + reservedList.Count);
-            return finalItem;
+            int maxQnt = Mathf.Clamp((int)(dynChar.credits / finalUnitPrice), 0, (int)(dynChar.CargoSpace / finalIMP.AsItem.weight));
+
+            return new Tuple<ItemMarketPrice, int>(finalIMP, maxQnt);
+        }
+
+        private static float GetPrice(ItemMarketPrice item, TSector sector)
+        {
+            return item.sellingPrice == -1 ? (item.tradePrice == -1 ? GameData.data.GalacticMarket().GetItemPriceOnSector(item.AsItem.id, sector) : item.tradePrice) : item.sellingPrice;
         }
 
         [HarmonyPatch(typeof(Station), nameof(Station.SellItemToNPC))]
@@ -347,8 +417,8 @@ namespace MC_SVTraderItemReserve
         [HarmonyPrefix]
         private static void CharacterSystemUpdate_Pre(CharacterSystem __instance, bool forced)
         {
-            if(forced || GameData.timePlayed - __instance.timeCountOnLastUpdate >= 30f)
-                log.LogWarning("=============== UPDATING TRADERS ===============");
+            if (forced || GameData.timePlayed - __instance.timeCountOnLastUpdate >= 30f)
+                if(cfgDebug.Value) log.LogInfo("=============== UPDATING TRADERS ===============");
         }
 
         private static TSector GetClosestSectorToTargetInWarpRange(TSector curSector, TSector targetSector, int maxRange)
@@ -416,12 +486,13 @@ namespace MC_SVTraderItemReserve
             }
             if (__instance.wantsToBuyItem == null)
             {
-                if (rand.Next(1, 11) <= 1)
+                __instance.DetermineItemToBuy(rand);
+
+                if (__instance.wantsToBuyItem == null)
                 {
                     __instance.GoToRandomSectorWithUnlimitedRange();
                     return false;
-                }
-                __instance.DetermineItemToBuy(rand);
+                }                
             }
             if (__instance.wantsToBuyItem != null)
             {
@@ -481,20 +552,6 @@ namespace MC_SVTraderItemReserve
             return false;
         }
 
-        public static List<T> ShuffleList<T>(List<T> list, System.Random rand)
-        {
-            int n = list.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = rand.Next(n + 1);
-                T value = list[k];
-                list[k] = list[n];
-                list[n] = value;
-            }
-
-            return list;
-        }
         private class ReserveEntry
         {
             internal int traderID;
