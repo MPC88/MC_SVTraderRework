@@ -20,6 +20,7 @@ namespace MC_SVTraderItemReserve
         public const string pluginVersion = "0.0.1";
 
         // Mod
+        private const int randomWarpsBeforeSellingAtZero = 8;
         private static int curTraderID = -1;
         private static List<ReserveEntry> reservedList = new List<ReserveEntry>();
 
@@ -378,14 +379,14 @@ namespace MC_SVTraderItemReserve
             ItemMarketPrice finalIMP = list[mpc.Rand.Next(0, list.Count)];
             float finalUnitPrice = GetPrice(finalIMP, mpc.sector);
             if (list.Count == 1 &&
-                GetHighestNearbyBuyingPrice(finalIMP.AsItem, dynChar.level, (dynChar.MaxWarpDistance * 7), mpc.sector, dynChar.level + 5, finalUnitPrice) == 0)
+                GetHighestNearbyBuyingPrice(finalIMP.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (randomWarpsBeforeSellingAtZero * 0.75f))), mpc.sector, dynChar.level + 5, finalUnitPrice) == 0)
                 return null;
             
             foreach (ItemMarketPrice item in list)
             {
                 float itemUnitPrice = GetPrice(item, mpc.sector);
                 if ((itemUnitPrice / item.AsItem.basePrice) < (finalUnitPrice / finalIMP.AsItem.basePrice) &&
-                    GetHighestNearbyBuyingPrice(item.AsItem, dynChar.level, (dynChar.MaxWarpDistance * 7), mpc.sector, dynChar.level + 5, itemUnitPrice) != 0)
+                    GetHighestNearbyBuyingPrice(item.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (randomWarpsBeforeSellingAtZero * 0.75f))), mpc.sector, dynChar.level + 5, itemUnitPrice) != 0)
                 {
                     finalIMP = item;
                     finalUnitPrice = itemUnitPrice;
@@ -491,7 +492,7 @@ namespace MC_SVTraderItemReserve
             {
                 ItemStockData stockDataByIndex = __instance.GetItemStock.GetStockDataByIndex(0);
                 if(cfgDebug.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ")");
-                float higherThanValue = ((__instance.failedAttempts < 10) ? __instance.lastUnitPricePaid : 0f);
+                float higherThanValue = ((__instance.failedAttempts < randomWarpsBeforeSellingAtZero) ? __instance.lastUnitPricePaid : 0f);
                 if(higherThanValue == 0)
                     if(cfgDebug.Value) log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed 3 attempts, setting target value to 0 and randomly warping.");
                 TSector nearbySectorWithHighestBuyingPrice = GameData.data.GetNearbySectorWithHighestBuyingPrice(stockDataByIndex.AsItem, __instance.level, __instance.MaxWarpDistance, __instance.Sector, __instance.level + 5, higherThanValue);
