@@ -275,6 +275,10 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AITraderControlPatches.cs" />
+    <Compile Include="BuyReservation.cs" />
+    <Compile Include="DynamicCharacterPatches.cs" />
+    <Compile Include="UtilityMethods.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
