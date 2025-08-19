@@ -30,12 +30,12 @@ namespace MC_SVTraderItemReserve
             return null;
         }
 
-        internal static int GetTotalReservedQuantity(List<BuyReservation> list, int itemID)
+        internal static int GetTotalReservedQuantity(List<BuyReservation> list, int itemID, int sectorIndex)
         {
             int qnt = 0;
 
             foreach (BuyReservation re in list)
-                if (re.itemID == itemID)
+                if (re.itemID == itemID && re.sectorIndex == sectorIndex)
                     qnt += re.qnt;
 
             return qnt;

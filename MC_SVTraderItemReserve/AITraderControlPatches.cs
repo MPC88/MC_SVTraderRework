@@ -34,8 +34,7 @@ namespace MC_SVTraderItemReserve
                         {
                             if (targetSector.IsBeingAttacked)
                             {
-                                if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - Target under attack.");
-                                Main.sellTargets.Remove(__instance.dynChar.id);
+                                Main.ClearSellTargets(__instance.dynChar, "TargetUnderAttack");
                                 return false;
                             }
 
@@ -52,10 +51,11 @@ namespace MC_SVTraderItemReserve
                         {
                             if (Main.sellTargets.TryGetValue(__instance.dynChar.id, out TSector sellTargetsector))
                             {
-                                if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + "), in sector: " + sellTargetsector.coords + " - Removing Sell Target - At target, no buying station.");
+                                if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.dynChar.name + " (" + __instance.dynChar.id + "), in sector: " + sellTargetsector.coords + " - Removing Sell Target - At target, no buying station.  Selling list count: " + Main.sellTargets.Count);
                                 Main.sellTargets.Remove(__instance.dynChar.id);
                             }
                             __instance.WarpDisappear(true);
+                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10, 10);
                             return false;
                         }
                     }
@@ -66,10 +66,9 @@ namespace MC_SVTraderItemReserve
                     {
                         lock (GameData.threadSaveLock)
                         {
-                            Main.curTraderID = __instance.dynChar.id;
-                            DynamicCharacterPatches.ClearReservations(__instance.dynChar, "Looking For New Item");
-
-                            __instance.dynChar.wantsToBuyItem = currentSector.MarketPriceControl().GetRandomItemToBuy(__instance.dynChar.CommerceLevel, 5);
+                            Main.ClearReservations(__instance.dynChar, "Looking For New Item");
+                            
+                            __instance.dynChar.wantsToBuyItem = Main.GetRandomItemToBuy(__instance.dynChar, currentSector.MarketPriceControl(), __instance.dynChar.CommerceLevel, 5);
                         }
                     }
                     if (__instance.dynChar.wantsToBuyItem != null)
@@ -92,13 +91,17 @@ namespace MC_SVTraderItemReserve
                                     }
                                 }
                             }
-                        }
+                        }                        
 
                         station = currentSector.GetStationSellingItem(__instance.dynChar.wantsToBuyItem, -1, 10, out var _);
                         if (station == null)
                         {
                             __instance.WarpDisappear(true);
-                            __instance.dynChar.ClearWishlist();
+                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10, 10);
+                            __instance.dynChar.wantsToBuyItem = null;
+                            Main.ClearBuyReservations(__instance.dynChar, "Null selling station in target sector.");
+                            if(Main.sellTargets.TryGetValue(__instance.dynChar.id, out _))
+                                Main.ClearSellTargets(__instance.dynChar, "Null selling station in target sector.");
                             return false;
                         }
                     }

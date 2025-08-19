@@ -16,14 +16,26 @@ namespace MC_SVTraderItemReserve
                 if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
         }
 
-
-        [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.DetermineItemToBuy))]
-        [HarmonyPrefix]
-        private static bool DynCharDetermineItemToBuy_Pre(DynamicCharacter __instance)
+        private static void DetermineItemToBuy(DynamicCharacter dynChar, System.Random rand)
         {
-            Main.curTraderID = __instance.id;
-            ClearReservations(__instance, "Looking For New Item");
-            return true;
+            if (rand == null)
+                rand = CharacterSystem.Rand;
+
+            Main.ClearReservations(dynChar, "Looking For New Item");
+
+            // Get nearby producer with no stock
+            dynChar.wantsToBuyItem = GetNearbyProducerWithNoStock(dynChar, dynChar.CommerceLevel, dynChar.MaxWarpDistance, dynChar.Sector, dynChar.level + 5, rand);
+
+            if (dynChar.wantsToBuyItem == null)
+            {
+                // Look for best purchase
+                dynChar.wantsToBuyItem = GetBestItemOfferNearby(dynChar.id, dynChar.CommerceLevel, dynChar.MaxWarpDistance, dynChar.Sector, dynChar.level + 5, rand);                
+            }
+            if (dynChar.wantsToBuyItem == null)
+            {
+                // Get random item
+                dynChar.wantsToBuyItem = Main.GetRandomItemToBuy(dynChar, dynChar.Sector.MarketPriceControl(), dynChar.CommerceLevel, 5);
+            }
         }
 
 
@@ -52,7 +64,7 @@ namespace MC_SVTraderItemReserve
                 {
                     if (targetSector.IsBeingAttacked)
                     {
-                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - Target under attack.");
+                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - Target under attack.  Selling list count: " + Main.sellTargets.Count);
                         Main.sellTargets.Remove(__instance.id);
                         return false;
                     }
@@ -69,7 +81,7 @@ namespace MC_SVTraderItemReserve
                     if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ")");
                     float higherThanValue = ((__instance.failedAttempts < Main.randomWarpsBeforeSellingAtZero) ? __instance.lastUnitPricePaid : 0f);
                     if (higherThanValue == 0)
-                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed 3 attempts, setting target value to 0 and randomly warping.");
+                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed " + Main.randomWarpsBeforeSellingAtZero + " attempts, setting target value to 0 and randomly warping.");
                     TSector nearbySectorWithHighestBuyingPrice = GameData.data.GetNearbySectorWithHighestBuyingPrice(stockDataByIndex.AsItem, __instance.level, __instance.MaxWarpDistance, __instance.Sector, __instance.level + 5, higherThanValue);
                     if (nearbySectorWithHighestBuyingPrice == null)
                     {
@@ -85,8 +97,7 @@ namespace MC_SVTraderItemReserve
                     }
                 }
 
-                float unitPrice;
-                Station stationBuyingItem = __instance.Sector.GetStationBuyingItem(stockDataByIndex.AsItem, -1, out unitPrice);
+                Station stationBuyingItem = __instance.Sector.GetStationBuyingItem(stockDataByIndex.AsItem, -1, out _);
                 if (stationBuyingItem != null)
                 {
                     if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") found station in sector.");
@@ -102,14 +113,14 @@ namespace MC_SVTraderItemReserve
             }
             if (__instance.wantsToBuyItem == null)
             {
-                __instance.DetermineItemToBuy(rand);
+                DetermineItemToBuy(__instance, rand);
 
                 if (__instance.wantsToBuyItem == null)
                 {
                     if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ")" + " found nothing to buy.  Warping");
                     if (Main.sellTargets.TryGetValue(__instance.id, out TSector targetSector))
                     {
-                        if (Main.cfgDebug.Value) Main.log.LogInfo("Ttrader: " + __instance.name + " (" + __instance.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - At target, no buying station.");
+                        if (Main.cfgDebug.Value) Main.log.LogInfo("Ttrader: " + __instance.name + " (" + __instance.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - At target, no buying station.  Selling list count: " + Main.sellTargets.Count);
                         Main.sellTargets.Remove(__instance.id);
                     }
                     __instance.GoToRandomSectorWithUnlimitedRange();
@@ -118,16 +129,19 @@ namespace MC_SVTraderItemReserve
             }
             if (__instance.wantsToBuyItem != null)
             {
-                BuyReservation reserveEntry = Main.buyReservations.Find(re => re.traderID == __instance.id);
+                BuyReservation buyReservation = Main.buyReservations.Find(re => re.traderID == __instance.id);
 
-                if (reserveEntry != null)
+                if (buyReservation != null)
                 {
-                    if (__instance.Sector.Index != reserveEntry.sectorIndex)
+                    if (__instance.Sector.Index != buyReservation.sectorIndex)
                     {
-                        TSector targetSector = GameData.data.sectors[reserveEntry.sectorIndex];
+                        TSector targetSector = GameData.data.sectors[buyReservation.sectorIndex];
                         if (targetSector.IsBeingAttacked)
                         {
-                            __instance.ClearWishlist();
+                            if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") Target sector under attack.");
+                            Main.ClearBuyReservations(__instance, "Target under attack");
+                            if (Main.sellTargets.TryGetValue(__instance.id, out _))
+                                Main.ClearSellTargets(__instance, "Buy target under attack.");
                             return false;
                         }
 
@@ -141,17 +155,23 @@ namespace MC_SVTraderItemReserve
                     }
                 }
 
-                float unitPrice2;
-                Station stationSellingItem = __instance.Sector.GetStationSellingItem(__instance.wantsToBuyItem, -1, 1, out unitPrice2);
+                Station stationSellingItem = __instance.Sector.GetStationSellingItem(__instance.wantsToBuyItem, -1, 1, out float unitPrice2);
                 if (stationSellingItem != null)
                 {
                     int maxQnt = Mathf.Clamp((int)(__instance.credits / unitPrice2), 0, (int)((float)__instance.CargoSpace / __instance.wantsToBuyItem.weight));
                     if (__instance.BuyItemFromStation(stationSellingItem, __instance.wantsToBuyItem, maxQnt))
-                        __instance.ClearWishlist();
-
+                    {
+                        __instance.wantsToBuyItem = null;
+                        Main.ClearBuyReservations(__instance, "Bought Items");
+                    }
                 }
                 else
-                    __instance.ClearWishlist();
+                {
+                    __instance.wantsToBuyItem = null;
+                    Main.ClearBuyReservations(__instance, "Null selling station in target sector.");
+                    if (Main.sellTargets.TryGetValue(__instance.id, out _))
+                        Main.ClearSellTargets(__instance, "Null selling station in target sector.");
+                }
 
                 return false;
             }
@@ -160,35 +180,174 @@ namespace MC_SVTraderItemReserve
             return false;
         }
 
-        internal static void ClearReservations(DynamicCharacter dynChar, string cause)
-        {
-            if (Main.cfgDebug.Value)
-            {
-                List<BuyReservation> remove = new List<BuyReservation>();
-                foreach (BuyReservation re in Main.buyReservations)
-                {
-                    if (re.traderID == dynChar.id)
-                    {
-                        Main.log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + ")" + ", Item: " + ItemDB.GetItem(re.itemID).itemName + " (" + re.itemID + ")" + ", qnt: " + re.qnt + ", sector: " + GameData.data.sectors[re.sectorIndex].coords + " - Removing Reservation - " + cause);
-                        remove.Add(re);
-                    }
-                }
-                Main.buyReservations = Main.buyReservations.Except(remove).ToList();
-            }
-            else
-            {
-                Main.buyReservations.RemoveAll(re => re.traderID == dynChar.id);
-            }
-        }
-
         [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.ClearWishlist))]
         [HarmonyPostfix]
         private static void DynamicCharacterClearWishlist_Post(DynamicCharacter __instance)
         {
             lock (GameData.threadSaveLock)
             {
-                ClearReservations(__instance, "Wish list Clear");
+                Main.ClearReservations(__instance, "Wish list Clear");
             }
         }
+
+        internal static Item GetNearbyProducerWithNoStock(DynamicCharacter dynChar, int commerceLevel, float maxRange, TSector fromSector, int maxSectorLevel, System.Random rand)
+        {
+            if (rand == null)
+                rand = new System.Random();
+
+            ItemMarketPrice finalItem = null;
+            Dictionary<ItemMarketPrice, BuyReservation> zeroStockBuyLocs = new Dictionary<ItemMarketPrice, BuyReservation>();
+            int maxLvl = commerceLevel + 2;
+            int minLvl = Mathf.RoundToInt(maxLvl / 2);
+            while (finalItem == null && maxLvl <= maxSectorLevel)
+            {
+                zeroStockBuyLocs.Clear();
+                List<TSector> sectorList = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(fromSector.posV2) <= maxRange && s.MarketPriceControl().HasAnyItemOffer(minLvl - 2, maxLvl + 2));
+                List<ItemMarketPrice> zeroStockItems = new List<ItemMarketPrice>();
+
+                if (sectorList.Count > 0)
+                {
+                    foreach (TSector s in sectorList)
+                    {
+                        ItemMarketPrice zeroStockItem = GetRandomZeroStockItemInSector(s, minLvl - 2, maxLvl + 2);
+                        if (zeroStockItem != null)
+                            zeroStockItems.Add(zeroStockItem);
+                    }
+
+                    if (zeroStockItems.Count > 0)
+                    {
+                        foreach (ItemMarketPrice zeroStockItem in zeroStockItems)
+                        {
+                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, maxRange, fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
+                            if (buyLoc.Item2 < 99999f)
+                            {
+                                int maxQnt = Mathf.Clamp((int)(dynChar.credits / buyLoc.Item2), 0, (int)(dynChar.CargoSpace / zeroStockItem.AsItem.weight));
+                                zeroStockBuyLocs.Add(zeroStockItem, new BuyReservation(dynChar.id, buyLoc.Item1.Index, zeroStockItem.itemID, maxQnt));
+                            }
+                        }
+
+                        if (zeroStockBuyLocs.Count > 0)
+                            finalItem = zeroStockBuyLocs.Keys.ToList()[rand.Next(0, zeroStockBuyLocs.Keys.Count)];
+                    }
+                }
+
+                if (finalItem == null)
+                {
+                    minLvl = minLvl - 2 > 0 ? minLvl - 2 : 1;
+                    maxLvl += 2;
+                }
+            }
+
+            if (finalItem == null)
+                return null;
+
+            Main.sellTargets.Add(dynChar.id, finalItem.mpc.sector);
+            if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + ")" + " planning to supply Item: " + ItemDB.GetItem(finalItem.AsItem.id).itemName + " (" + finalItem.AsItem.id + ")" + " to sector: " + finalItem.mpc.sector.coords + ".  Selling list count: " + Main.sellTargets.Count);
+            Main.buyReservations.Add(zeroStockBuyLocs[finalItem]);
+            if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + ")" + " reserving Item: " + ItemDB.GetItem(finalItem.AsItem.id).itemName + " (" + finalItem.AsItem.id + ")" + " Qnt: " + zeroStockBuyLocs[finalItem].qnt + " in sector: " + GameData.data.sectors[zeroStockBuyLocs[finalItem].sectorIndex].coords + " - Reserved list count: " + Main.buyReservations.Count);
+            return finalItem.AsItem;
+        }
+
+        private static ItemMarketPrice GetRandomZeroStockItemInSector(TSector sector, int minItemLvl, int maxItemLvl)
+        {
+            List<ItemMarketPrice> list = sector.MarketPriceControl().prices.FindAll((ItemMarketPrice p) => p.IsBuying && p.AsItem.itemLevel >= minItemLvl && p.AsItem.itemLevel <= maxItemLvl);
+
+            List<ItemMarketPrice> remove = new List<ItemMarketPrice>();
+            foreach (ItemMarketPrice imp in list)
+            {
+                Station station = sector.GetStationBuyingItem(imp.AsItem, -1, out float unitPrice);
+                if (station != null)
+                {
+                    SM_Market market = station.MarketModule;
+                    if (market != null)
+                    {
+                        if (market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock > 0)
+                            remove.Add(imp);
+                    }
+                }
+            }
+            list = list.Except(remove).ToList();
+
+            if (list.Count <= 0)
+                return null;
+
+            return list[sector.MarketPriceControl().Rand.Next(0, list.Count)];
+        }
+
+        internal static Item GetBestItemOfferNearby(int dynCharID, int commerceLevel, float maxRange, TSector fromSector, int maxSectorLevel, System.Random rand)
+        {
+            if (rand == null)
+                rand = new System.Random();
+
+            Tuple<ItemMarketPrice, int> finalResult = null;
+            int maxLvl = commerceLevel + 2;
+            int minLvl = Mathf.RoundToInt(maxLvl / 2);
+            while (finalResult == null && maxLvl <= maxSectorLevel)
+            {
+                List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(fromSector.posV2) <= maxRange && s.MarketPriceControl().HasAnyItemOffer(minLvl - 2, maxLvl + 2));
+                List<Tuple<ItemMarketPrice, int>> bestItemOffers = new List<Tuple<ItemMarketPrice, int>>();
+
+                if (list.Count > 0)
+                {
+                    foreach (TSector s in list)
+                    {
+                        Tuple<ItemMarketPrice, int> bestSectorItem = GetBestItemOfferInSector(dynCharID, s.MarketPriceControl(), minLvl - 2, maxLvl + 2);
+                        if (bestSectorItem != null)
+                            bestItemOffers.Add(bestSectorItem);
+                    }
+
+                    if (bestItemOffers.Count > 0)
+                    {
+                        float finalUnitPrice = 0;
+                        foreach (Tuple<ItemMarketPrice, int> itemOffer in bestItemOffers)
+                        {
+                            if (finalResult == null)
+                            {
+                                finalResult = itemOffer;
+                                finalUnitPrice = UtilityMethods.GetSellingPrice(finalResult.Item1, finalResult.Item1.mpc.sector);
+                            }
+                            else
+                            {
+                                float iUnitPrice = UtilityMethods.GetSellingPrice(itemOffer.Item1, itemOffer.Item1.mpc.sector);
+                                if ((iUnitPrice / itemOffer.Item1.AsItem.basePrice) < (finalUnitPrice / finalResult.Item1.AsItem.basePrice))
+                                {
+                                    finalResult = itemOffer;
+                                    finalUnitPrice = iUnitPrice;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (finalResult == null)
+                {
+                    minLvl = minLvl - 2 > 0 ? minLvl - 2 : 1;
+                    maxLvl += 2;
+                }
+            }
+
+            if (finalResult == null)
+                return null;
+
+            Main.buyReservations.Add(new BuyReservation(dynCharID, finalResult.Item1.mpc.sector.Index, finalResult.Item1.AsItem.id, finalResult.Item2));
+            if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + GameData.data.characterSystem.dynChars.Find(dc => dc.id == dynCharID).name + " (" + dynCharID + ")" + " reserving Item: " + ItemDB.GetItem(finalResult.Item1.AsItem.id).itemName + " (" + finalResult.Item1.AsItem.id + ")" + " Qnt: " + finalResult.Item2 + " in sector: " + finalResult.Item1.mpc.sector.coords + ".  Reserved list count: " + Main.buyReservations.Count);
+            return finalResult.Item1.AsItem;
+        }
+
+        private static Tuple<ItemMarketPrice, int> GetBestItemOfferInSector(int dynCharID, MarketPriceControl __instance, int minItemLvl, int maxItemLvl)
+        {
+            DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == dynCharID);
+
+            List<ItemMarketPrice> newList = UtilityMethods.FilterBuyingMarketItemList(
+                __instance.prices.FindAll((ItemMarketPrice p) => p.IsSelling && p.AsItem.itemLevel >= minItemLvl && p.AsItem.itemLevel <= maxItemLvl),
+                __instance.sector,
+                dynChar);
+
+            if (newList.Count <= 0)
+                return null;
+
+            return UtilityMethods.GetFinalBuyingItem(__instance, newList, dynChar);
+        }
+
     }
 }
