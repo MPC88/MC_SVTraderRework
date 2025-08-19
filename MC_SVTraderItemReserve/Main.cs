@@ -39,6 +39,42 @@ namespace MC_SVTraderItemReserve
                 "Log debug messages");
         }
 
+        public void Update()
+        {
+            if (!cfgDebug.Value)
+                return;
+
+            if (Input.GetKeyDown(KeyCode.PageUp))
+            {
+                lock(GameData.threadSaveLock)
+                {
+                    log.LogWarning("-------------------------------------Sell Targets-------------------------------------");                    
+                    foreach (KeyValuePair<int, TSector> kvp in sellTargets)
+                    {
+                        DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == kvp.Key);
+                        log.LogWarning("Trader: " + dynChar.name + " (" + dynChar.id + ")" + " target sector: " + kvp.Value.coords);
+                    }
+                    log.LogWarning("--------------------------------------------------------------------------------------");
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.PageDown))
+            {
+                lock(GameData.threadSaveLock)
+                {
+                    log.LogWarning("-------------------------------------Buy Reservations-------------------------------------");
+                    foreach (BuyReservation re in buyReservations)
+                    {
+                        DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == re.traderID);
+                        TSector sector = GameData.data.sectors.Find(s => s.Index == re.sectorIndex);
+                        Item item = ItemDB.GetItem(re.itemID);
+                        log.LogWarning("Trader: " + dynChar.name + " (" + dynChar.id + ") Target sector:" + sector.coords + " Item: " + item.itemName + " (" + item.id + ") Qnt: " + re.qnt);
+                    }
+                    log.LogWarning("------------------------------------------------------------------------------------------");
+                }
+            }
+        }
+
         internal static Item GetRandomItemToBuy(DynamicCharacter dynChar, MarketPriceControl __instance, int commerceLevel, int randomness)
         {
             List<ItemMarketPrice> newList = UtilityMethods.FilterBuyingMarketItemList(
@@ -111,7 +147,7 @@ namespace MC_SVTraderItemReserve
             {
                 if (sellTargets.TryGetValue(dynChar.id, out TSector targetSector))
                 {
-                    if (cfgDebug.Value) log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + "), in sector: " + targetSector.coords + " - Removing Sell Target - " + cause + " - Selling list count: " + sellTargets.Count);
+                    if (cfgDebug.Value) log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + "), target sector: " + targetSector.coords + " - Removing Sell Target - " + cause + " - Selling list count: " + sellTargets.Count);
                     sellTargets.Remove(dynChar.id);
                 }
             }

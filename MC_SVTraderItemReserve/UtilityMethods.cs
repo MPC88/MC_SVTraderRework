@@ -64,7 +64,7 @@ namespace MC_SVTraderItemReserve
                 }
                 else
                 {
-                    Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out float unitPrice);
+                    Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out float unitPrice);
                     if (station != null)
                     {
                         SM_Market market = station.MarketModule;

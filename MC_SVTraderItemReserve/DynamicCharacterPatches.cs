@@ -38,7 +38,6 @@ namespace MC_SVTraderItemReserve
             }
         }
 
-
         [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.UpdateCharacter))]
         [HarmonyPrefix]
         private static bool DynamicCharacterUpdate_Pre(DynamicCharacter __instance)
@@ -76,7 +75,7 @@ namespace MC_SVTraderItemReserve
                         return false;
                     }
                 }
-                else
+                else if (!Main.sellTargets.TryGetValue(__instance.id, out _))
                 {
                     if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ")");
                     float higherThanValue = ((__instance.failedAttempts < Main.randomWarpsBeforeSellingAtZero) ? __instance.lastUnitPricePaid : 0f);
@@ -218,7 +217,7 @@ namespace MC_SVTraderItemReserve
                     {
                         foreach (ItemMarketPrice zeroStockItem in zeroStockItems)
                         {
-                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, maxRange, fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
+                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.randomWarpsBeforeSellingAtZero * 0.75f))), fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
                             if (buyLoc.Item2 < 99999f)
                             {
                                 int maxQnt = Mathf.Clamp((int)(dynChar.credits / buyLoc.Item2), 0, (int)(dynChar.CargoSpace / zeroStockItem.AsItem.weight));
@@ -250,23 +249,20 @@ namespace MC_SVTraderItemReserve
 
         private static ItemMarketPrice GetRandomZeroStockItemInSector(TSector sector, int minItemLvl, int maxItemLvl)
         {
-            List<ItemMarketPrice> list = sector.MarketPriceControl().prices.FindAll((ItemMarketPrice p) => p.IsBuying && p.AsItem.itemLevel >= minItemLvl && p.AsItem.itemLevel <= maxItemLvl);
+            List<ItemMarketPrice> list = new List<ItemMarketPrice>();
 
-            List<ItemMarketPrice> remove = new List<ItemMarketPrice>();
-            foreach (ItemMarketPrice imp in list)
+            for(int i = 0; i < sector.stationIDs.Count; i++)
             {
-                Station station = sector.GetStationBuyingItem(imp.AsItem, -1, out float unitPrice);
-                if (station != null)
-                {
-                    SM_Market market = station.MarketModule;
-                    if (market != null)
-                    {
-                        if (market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock > 0)
-                            remove.Add(imp);
-                    }
-                }
+                Station station = GameData.GetStation(sector.stationIDs[i]);
+                if (station == null) continue;
+
+                SM_Market market = station.MarketModule;
+                if (market == null) continue;
+
+                foreach(MarketItem item in market.MarketList)
+                    if (item.JustBuying && item.Stock <= 0)
+                        list.Add(sector.MarketPriceControl().prices.Find(imp => imp.itemID == item.itemID));
             }
-            list = list.Except(remove).ToList();
 
             if (list.Count <= 0)
                 return null;
