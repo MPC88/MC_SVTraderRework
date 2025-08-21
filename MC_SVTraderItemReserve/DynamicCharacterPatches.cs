@@ -236,7 +236,7 @@ namespace MC_SVTraderItemReserve
             ItemMarketPrice finalItem = null;
             Dictionary<ItemMarketPrice, BuyReservation> zeroStockBuyLocs = new Dictionary<ItemMarketPrice, BuyReservation>();
             int maxLvl = commerceLevel + 2;
-            int minLvl = Mathf.RoundToInt(maxLvl / 2);
+            int minLvl = 0;
             while (finalItem == null && maxLvl <= maxSectorLevel)
             {
                 zeroStockBuyLocs.Clear();
@@ -271,7 +271,6 @@ namespace MC_SVTraderItemReserve
 
                 if (finalItem == null)
                 {
-                    minLvl = minLvl - 2 > 0 ? minLvl - 2 : 1;
                     maxLvl += 2;
                 }
             }
