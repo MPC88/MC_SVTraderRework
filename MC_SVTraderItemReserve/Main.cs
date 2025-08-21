@@ -18,7 +18,9 @@ namespace MC_SVTraderItemReserve
         public const string pluginVersion = "0.0.1";
 
         // Mod
-        internal const int randomWarpsBeforeSellingAtZero = 4;
+        public static ConfigEntry<int> cfgInsufficientStockLimit;
+        public static ConfigEntry<float> cfgSellQntTarget;
+        public static ConfigEntry<int> cfgRandomWarpTries;
         internal static List<BuyReservation> buyReservations = new List<BuyReservation>();
         internal static Dictionary<int, TSector> sellTargets = new Dictionary<int, TSector>();
 
@@ -31,6 +33,24 @@ namespace MC_SVTraderItemReserve
             Harmony.CreateAndPatchAll(typeof(Main));
             Harmony.CreateAndPatchAll(typeof(AITraderControlPatches));
             Harmony.CreateAndPatchAll(typeof(DynamicCharacterPatches));
+
+            cfgSellQntTarget = Config.Bind<float>(
+                "Selling",
+                "Sell quantity target %",
+                75,
+                "The % of trader's current cargo that must be available to sell when looking for a sell location.");
+
+            cfgRandomWarpTries = Config.Bind<int>(
+                "Selling",
+                "Random warp tries",
+                4,
+                "When searching for sell location, the number of random warps a trader makes before setting their target sell unit price to 0.");
+
+            cfgInsufficientStockLimit = Config.Bind<int>(
+                "Buying",
+                "Insufficient stock limit",
+                5,
+                "The stock level where a trader will attempt to supply a producer.");
 
             cfgDebug = Config.Bind<bool>(
                 "Debug",

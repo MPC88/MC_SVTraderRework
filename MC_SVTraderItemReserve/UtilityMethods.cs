@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using static System.Collections.Specialized.BitVector32;
 
 namespace MC_SVTraderItemReserve
 {
@@ -97,14 +98,14 @@ namespace MC_SVTraderItemReserve
             ItemMarketPrice finalIMP = list[mpc.Rand.Next(0, list.Count)];
             float finalUnitPrice = GetSellingPrice(finalIMP, mpc.sector);
             if (list.Count == 1 &&
-                GetHighestNearbyBuyingPriceForItem(finalIMP.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.randomWarpsBeforeSellingAtZero * 0.75f))), mpc.sector, dynChar.level + 5, finalUnitPrice) == 0)
+                GetHighestNearbyBuyingPriceForItem(finalIMP.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, finalUnitPrice) == 0)
                 return null;
 
             foreach (ItemMarketPrice item in list)
             {
                 float itemUnitPrice = GetSellingPrice(item, mpc.sector);
                 if ((itemUnitPrice / item.AsItem.basePrice) < (finalUnitPrice / finalIMP.AsItem.basePrice) &&
-                    GetHighestNearbyBuyingPriceForItem(item.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.randomWarpsBeforeSellingAtZero * 0.75f))), mpc.sector, dynChar.level + 5, itemUnitPrice) != 0)
+                    GetHighestNearbyBuyingPriceForItem(item.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, itemUnitPrice) != 0)
                 {
                     finalIMP = item;
                     finalUnitPrice = itemUnitPrice;
@@ -116,7 +117,7 @@ namespace MC_SVTraderItemReserve
             return new Tuple<ItemMarketPrice, int>(finalIMP, maxQnt);
         }
 
-        private static float GetHighestNearbyBuyingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float higherThanValue)
+        private static float GetHighestNearbyBuyingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float higherThanValue, int maxQnt)
         {
             int minLvl = 0;
             int maxLvl = baseLevel + 2;
@@ -124,12 +125,21 @@ namespace MC_SVTraderItemReserve
             while (finalHighestBuyingPrice == 0 && maxLvl <= maxSectorLevel)
             {
                 List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(closeToSector.posV2) <= maxRange);
-                for (int i = 0; i < list.Count; i++)
+
+                foreach(TSector s in list)
                 {
-                    float highestBuyingPrice = list[i].MarketPriceControl().GetHighestBuyingPrice(item);
-                    if (highestBuyingPrice != -1f && highestBuyingPrice > higherThanValue && highestBuyingPrice > finalHighestBuyingPrice)
+                    for (int j = 0; j < s.stationIDs.Count; j++)
                     {
-                        finalHighestBuyingPrice = highestBuyingPrice;
+                        Station station = GameData.GetStation(s.stationIDs[j], allowDestroyedOrWrecked: false);
+                        if (station != null)
+                        {
+                            float marketPriceForItem = station.GetMarketPriceForItem(item, 1, out int curStock);
+
+                            int availableStock = station.GetItemStationStock(item);
+
+                            if (marketPriceForItem != -1f && marketPriceForItem > finalHighestBuyingPrice && availableStock > (Mathf.CeilToInt(maxQnt * (Main.cfgSellQntTarget.Value / 100))))
+                                finalHighestBuyingPrice = marketPriceForItem;
+                        }
                     }
                 }
                 if (finalHighestBuyingPrice == 0)

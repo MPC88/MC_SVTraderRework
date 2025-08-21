@@ -23,8 +23,8 @@ namespace MC_SVTraderItemReserve
 
             Main.ClearReservations(dynChar, "Looking For New Item");
 
-            // Get nearby producer with no stock
-            dynChar.wantsToBuyItem = GetNearbyProducerWithNoStock(dynChar, dynChar.CommerceLevel, dynChar.MaxWarpDistance, dynChar.Sector, dynChar.level + 5, rand);
+            // Get nearby producer with insufficient stock
+            dynChar.wantsToBuyItem = GetNearbyProducerWithInsufficientStock(dynChar, dynChar.CommerceLevel, dynChar.MaxWarpDistance, dynChar.Sector, dynChar.level + 5, rand);
 
             if (dynChar.wantsToBuyItem == null)
             {
@@ -78,9 +78,9 @@ namespace MC_SVTraderItemReserve
                 else if (!Main.sellTargets.TryGetValue(__instance.id, out _))
                 {
                     if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ")");
-                    float higherThanValue = ((__instance.failedAttempts < Main.randomWarpsBeforeSellingAtZero) ? __instance.lastUnitPricePaid : 0f);
+                    float higherThanValue = ((__instance.failedAttempts < Main.cfgRandomWarpTries.Value) ? __instance.lastUnitPricePaid : 0f);
                     if (higherThanValue == 0)
-                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed " + Main.randomWarpsBeforeSellingAtZero + " attempts, setting target value to 0 and randomly warping.");
+                        if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed " + Main.cfgRandomWarpTries.Value + " attempts, setting target value to 0 and randomly warping.");
                     TSector nearbySectorWithHighestBuyingPrice = GameData.data.GetNearbySectorWithHighestBuyingPrice(stockDataByIndex.AsItem, __instance.level, __instance.MaxWarpDistance, __instance.Sector, __instance.level + 5, higherThanValue);
                     if (nearbySectorWithHighestBuyingPrice == null)
                     {
@@ -189,7 +189,7 @@ namespace MC_SVTraderItemReserve
             }
         }
 
-        internal static Item GetNearbyProducerWithNoStock(DynamicCharacter dynChar, int commerceLevel, float maxRange, TSector fromSector, int maxSectorLevel, System.Random rand)
+        internal static Item GetNearbyProducerWithInsufficientStock(DynamicCharacter dynChar, int commerceLevel, float maxRange, TSector fromSector, int maxSectorLevel, System.Random rand)
         {
             if (rand == null)
                 rand = new System.Random();
@@ -208,7 +208,7 @@ namespace MC_SVTraderItemReserve
                 {
                     foreach (TSector s in sectorList)
                     {
-                        ItemMarketPrice zeroStockItem = GetRandomZeroStockItemInSector(s, minLvl - 2, maxLvl + 2);
+                        ItemMarketPrice zeroStockItem = GetRandomInsufficientStockItemInSector(s, minLvl - 2, maxLvl + 2);
                         if (zeroStockItem != null)
                             zeroStockItems.Add(zeroStockItem);
                     }
@@ -217,7 +217,7 @@ namespace MC_SVTraderItemReserve
                     {
                         foreach (ItemMarketPrice zeroStockItem in zeroStockItems)
                         {
-                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.randomWarpsBeforeSellingAtZero * 0.75f))), fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
+                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
                             if (buyLoc.Item2 < 99999f)
                             {
                                 int maxQnt = Mathf.Clamp((int)(dynChar.credits / buyLoc.Item2), 0, (int)(dynChar.CargoSpace / zeroStockItem.AsItem.weight));
@@ -247,7 +247,7 @@ namespace MC_SVTraderItemReserve
             return finalItem.AsItem;
         }
 
-        private static ItemMarketPrice GetRandomZeroStockItemInSector(TSector sector, int minItemLvl, int maxItemLvl)
+        private static ItemMarketPrice GetRandomInsufficientStockItemInSector(TSector sector, int minItemLvl, int maxItemLvl)
         {
             List<ItemMarketPrice> list = new List<ItemMarketPrice>();
 
@@ -260,7 +260,7 @@ namespace MC_SVTraderItemReserve
                 if (market == null) continue;
 
                 foreach(MarketItem item in market.MarketList)
-                    if (item.JustBuying && item.Stock <= 0)
+                    if (item.JustBuying && item.Stock <= Main.cfgInsufficientStockLimit.Value)
                         list.Add(sector.MarketPriceControl().prices.Find(imp => imp.itemID == item.itemID));
             }
 
