@@ -194,7 +194,7 @@ namespace MC_SVTraderItemReserve
             }
 
             if (sector == null)
-                if(Main.cfgDebug.Value) Main.log.LogInfo("No buy location nearby to fill demand for " + item.itemName + " (" + item.id + ") in sector " + closeToSector.coords + " in range: " + maxRange + " lower than level: " + maxSectorLevel);
+                if(Main.cfgDebug.Value) Main.log.LogInfo("No buy location nearby to fill demand for " + item.itemName + " (" + item.id + ") in sector " + closeToSector.coords + " in range: " + maxRange + " <= level: " + maxSectorLevel);
 
             return new Tuple<TSector, float>(sector, finalLowestSellingPrice);
         }
