@@ -21,6 +21,7 @@ namespace MC_SVTraderItemReserve
         public static ConfigEntry<int> cfgInsufficientStockLimit;
         public static ConfigEntry<float> cfgSellQntTarget;
         public static ConfigEntry<int> cfgRandomWarpTries;
+        internal static object listLock = new object();
         internal static List<BuyReservation> buyReservations = new List<BuyReservation>();
         internal static Dictionary<int, TSector> sellTargets = new Dictionary<int, TSector>();
 
@@ -66,9 +67,9 @@ namespace MC_SVTraderItemReserve
 
             if (Input.GetKeyDown(KeyCode.PageUp))
             {
-                lock(GameData.threadSaveLock)
+                lock (Main.listLock)
                 {
-                    log.LogWarning("-------------------------------------Sell Targets-------------------------------------");                    
+                    log.LogWarning("-------------------------------------Sell Targets-------------------------------------");
                     foreach (KeyValuePair<int, TSector> kvp in sellTargets)
                     {
                         DynamicCharacter dynChar = GameData.data.characterSystem.dynChars.Find(dc => dc.id == kvp.Key);
@@ -80,7 +81,7 @@ namespace MC_SVTraderItemReserve
 
             if (Input.GetKeyDown(KeyCode.PageDown))
             {
-                lock(GameData.threadSaveLock)
+                lock (Main.listLock)
                 {
                     log.LogWarning("-------------------------------------Buy Reservations-------------------------------------");
                     foreach (BuyReservation re in buyReservations)
@@ -92,6 +93,18 @@ namespace MC_SVTraderItemReserve
                     }
                     log.LogWarning("------------------------------------------------------------------------------------------");
                 }
+            }
+        }
+
+        [HarmonyPatch(typeof(MenuControl), nameof(MenuControl.LoadGame))]
+        [HarmonyPatch(typeof(MenuControl), nameof(MenuControl.QuitToMainMenu))]
+        [HarmonyPostfix]
+        private static void MenuControlLoadOrQuit_Post()
+        {
+            lock(Main.listLock)
+            {
+                buyReservations.Clear();
+                sellTargets.Clear();
             }
         }
 
@@ -112,8 +125,11 @@ namespace MC_SVTraderItemReserve
             if (finalResult == null)
                 return null;
 
-            buyReservations.Add(new BuyReservation(dynChar.id, __instance.sector.Index, finalResult.Item1.AsItem.id, finalResult.Item2));
-            if (cfgDebug.Value) log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + ")" + " reserving Item: " + ItemDB.GetItem(finalResult.Item1.AsItem.id).itemName + " (" + finalResult.Item1.AsItem.id + ")" + " Qnt: " + finalResult.Item2 + " in sector: " + __instance.sector.coords + ".  Reserved list count: " + buyReservations.Count);
+            lock (Main.listLock)
+            {
+                buyReservations.Add(new BuyReservation(dynChar.id, __instance.sector.Index, finalResult.Item1.AsItem.id, finalResult.Item2));
+                if (cfgDebug.Value) log.LogInfo("Trader: " + dynChar.name + " (" + dynChar.id + ")" + " reserving Item: " + ItemDB.GetItem(finalResult.Item1.AsItem.id).itemName + " (" + finalResult.Item1.AsItem.id + ")" + " Qnt: " + finalResult.Item2 + " in sector: " + __instance.sector.coords + ".  Reserved list count: " + buyReservations.Count);
+            }
             return finalResult.Item1.AsItem;
         }
 
@@ -139,11 +155,11 @@ namespace MC_SVTraderItemReserve
 
         internal static void ClearBuyReservations(DynamicCharacter dynChar, string cause)
         {
-            lock (GameData.threadSaveLock)
+            if (Main.cfgDebug.Value)
             {
-                if (Main.cfgDebug.Value)
+                List<BuyReservation> remove = new List<BuyReservation>();
+                lock (Main.listLock)
                 {
-                    List<BuyReservation> remove = new List<BuyReservation>();
                     foreach (BuyReservation re in Main.buyReservations)
                     {
                         if (re.traderID == dynChar.id)
@@ -154,7 +170,10 @@ namespace MC_SVTraderItemReserve
                     }
                     Main.buyReservations = Main.buyReservations.Except(remove).ToList();
                 }
-                else
+            }
+            else
+            {
+                lock (Main.listLock)
                 {
                     Main.buyReservations.RemoveAll(re => re.traderID == dynChar.id);
                 }
@@ -163,7 +182,7 @@ namespace MC_SVTraderItemReserve
 
         internal static void ClearSellTargets(DynamicCharacter dynChar, string cause)
         {
-            lock (GameData.threadSaveLock)
+            lock (Main.listLock)
             {
                 if (sellTargets.TryGetValue(dynChar.id, out TSector targetSector))
                 {

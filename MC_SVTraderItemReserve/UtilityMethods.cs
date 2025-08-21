@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using static System.Collections.Specialized.BitVector32;
 
 namespace MC_SVTraderItemReserve
 {
@@ -54,39 +53,42 @@ namespace MC_SVTraderItemReserve
         internal static List<ItemMarketPrice> FilterBuyingMarketItemList(List<ItemMarketPrice> list, TSector sector, DynamicCharacter dynChar)
         {
             List<ItemMarketPrice> newList = new List<ItemMarketPrice>();
-            foreach (ItemMarketPrice imp in list)
+            lock (Main.listLock)
             {
-                BuyReservation re = BuyReservation.EntryExists(Main.buyReservations, sector.Index, imp.itemID);
-                if (re == null)
+                foreach (ItemMarketPrice imp in list)
                 {
-                    Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out float _);
-                    if (station != null)
-                        newList.Add(imp);
-                }
-                else
-                {
-                    Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out float unitPrice);
-                    if (station != null)
+                    BuyReservation re = BuyReservation.EntryExists(Main.buyReservations, sector.Index, imp.itemID);
+                    if (re == null)
                     {
-                        SM_Market market = station.MarketModule;
-                        if (market != null)
+                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out float _);
+                        if (station != null)
+                            newList.Add(imp);
+                    }
+                    else
+                    {
+                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out float unitPrice);
+                        if (station != null)
                         {
-                            int availableQnt = market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, imp.itemID, sector.Index);
+                            SM_Market market = station.MarketModule;
+                            if (market != null)
+                            {
+                                int availableQnt = market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, imp.itemID, sector.Index);
 
-                            unitPrice = GetSellingPrice(imp, sector);
+                                unitPrice = GetSellingPrice(imp, sector);
 
-                            int desiredQnt = Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight));
+                                int desiredQnt = Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight));
 
-                            if (desiredQnt <= availableQnt)
-                                newList.Add(imp);
+                                if (desiredQnt <= availableQnt)
+                                    newList.Add(imp);
+                                else if (Main.cfgDebug.Value)
+                                    Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to insufficent stock: " + availableQnt + " (desired: " + desiredQnt + ")");
+                            }
                             else if (Main.cfgDebug.Value)
-                                Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to insufficent stock: " + availableQnt + " (desired: " + desiredQnt + ")");
+                                Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL MARKET MODULE");
                         }
                         else if (Main.cfgDebug.Value)
-                            Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL MARKET MODULE");
+                            Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL STATION");
                     }
-                    else if (Main.cfgDebug.Value)
-                        Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL STATION");
                 }
             }
 
@@ -97,31 +99,34 @@ namespace MC_SVTraderItemReserve
         {
             ItemMarketPrice finalIMP = list[mpc.Rand.Next(0, list.Count)];
             float finalUnitPrice = GetSellingPrice(finalIMP, mpc.sector);
+            int maxQnt = Mathf.Clamp((int)(dynChar.credits / finalUnitPrice), 0, (int)(dynChar.CargoSpace / finalIMP.AsItem.weight));
+
             if (list.Count == 1 &&
-                GetHighestNearbyBuyingPriceForItem(finalIMP.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, finalUnitPrice) == 0)
+                GetHighestNearbyBuyingPriceForItem(finalIMP.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, finalUnitPrice, maxQnt).Item2 == 0)
                 return null;
 
             foreach (ItemMarketPrice item in list)
             {
                 float itemUnitPrice = GetSellingPrice(item, mpc.sector);
+                maxQnt = Mathf.Clamp((int)(dynChar.credits / finalUnitPrice), 0, (int)(dynChar.CargoSpace / finalIMP.AsItem.weight));
+
                 if ((itemUnitPrice / item.AsItem.basePrice) < (finalUnitPrice / finalIMP.AsItem.basePrice) &&
-                    GetHighestNearbyBuyingPriceForItem(item.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, itemUnitPrice) != 0)
+                    GetHighestNearbyBuyingPriceForItem(item.AsItem, dynChar.level, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), mpc.sector, dynChar.level + 5, itemUnitPrice, maxQnt).Item2 != 0)
                 {
                     finalIMP = item;
                     finalUnitPrice = itemUnitPrice;
                 }
             }
 
-            int maxQnt = Mathf.Clamp((int)(dynChar.credits / finalUnitPrice), 0, (int)(dynChar.CargoSpace / finalIMP.AsItem.weight));
-
             return new Tuple<ItemMarketPrice, int>(finalIMP, maxQnt);
         }
 
-        private static float GetHighestNearbyBuyingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float higherThanValue, int maxQnt)
+        internal static Tuple<TSector, float> GetHighestNearbyBuyingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float higherThanValue, int qntTarget)
         {
             int minLvl = 0;
             int maxLvl = baseLevel + 2;
             float finalHighestBuyingPrice = 0f;
+            TSector sector = null;
             while (finalHighestBuyingPrice == 0 && maxLvl <= maxSectorLevel)
             {
                 List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(closeToSector.posV2) <= maxRange);
@@ -133,12 +138,13 @@ namespace MC_SVTraderItemReserve
                         Station station = GameData.GetStation(s.stationIDs[j], allowDestroyedOrWrecked: false);
                         if (station != null)
                         {
-                            float marketPriceForItem = station.GetMarketPriceForItem(item, 1, out int curStock);
+                            float marketPriceForItem = station.GetMarketPriceForItem(item, 1, out int buyingQnt);
 
-                            int availableStock = station.GetItemStationStock(item);
-
-                            if (marketPriceForItem != -1f && marketPriceForItem > finalHighestBuyingPrice && availableStock > (Mathf.CeilToInt(maxQnt * (Main.cfgSellQntTarget.Value / 100))))
+                            if (marketPriceForItem != -1f && marketPriceForItem > finalHighestBuyingPrice && buyingQnt > (Mathf.CeilToInt(qntTarget * (Main.cfgSellQntTarget.Value / 100))))
+                            {
                                 finalHighestBuyingPrice = marketPriceForItem;
+                                sector = s;
+                            }
                         }
                     }
                 }
@@ -147,7 +153,7 @@ namespace MC_SVTraderItemReserve
                     maxLvl += 2;
                 }
             }
-            return finalHighestBuyingPrice;
+            return new Tuple<TSector, float>(sector, finalHighestBuyingPrice);
         }
 
         internal static Tuple<TSector, float> GetLowestAvailableNearbySellingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float lowerThanValue)
@@ -156,33 +162,40 @@ namespace MC_SVTraderItemReserve
             int maxLvl = baseLevel + 2;
             float finalLowestSellingPrice = 99999;
             TSector sector = null;
-            while (finalLowestSellingPrice == 99999 && maxLvl <= maxSectorLevel)
+            lock (Main.listLock)
             {
-                List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(closeToSector.posV2) <= maxRange);
-                foreach(TSector s in list)
+                while (finalLowestSellingPrice == 99999 && maxLvl <= maxSectorLevel)
                 {
-                    for (int j = 0; j < s.stationIDs.Count; j++)
+                    List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(closeToSector.posV2) <= maxRange);
+                    foreach (TSector s in list)
                     {
-                        Station station = GameData.GetStation(s.stationIDs[j], allowDestroyedOrWrecked: false);
-                        if (station != null)
+                        for (int j = 0; j < s.stationIDs.Count; j++)
                         {
-                            float marketPriceForItem = station.GetMarketPriceForItem(item, 0, out int curStock);
-
-                            int availableStock = station.GetItemStationStock(item) - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, item.id, s.Index);
-
-                            if (marketPriceForItem != -1f && marketPriceForItem < finalLowestSellingPrice && availableStock > 0)
+                            Station station = GameData.GetStation(s.stationIDs[j], allowDestroyedOrWrecked: false);
+                            if (station != null)
                             {
-                                finalLowestSellingPrice = marketPriceForItem;
-                                sector = s;
+                                float marketPriceForItem = station.GetMarketPriceForItem(item, 0, out int curStock);
+
+                                int availableStock = station.GetItemStationStock(item) - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, item.id, s.Index);
+
+                                if (marketPriceForItem != -1f && marketPriceForItem < finalLowestSellingPrice && availableStock > 0)
+                                {
+                                    finalLowestSellingPrice = marketPriceForItem;
+                                    sector = s;
+                                }
                             }
                         }
                     }
-                }
-                if (finalLowestSellingPrice == 99999)
-                {
-                    maxLvl += 2;
+                    if (finalLowestSellingPrice == 99999)
+                    {
+                        maxLvl += 2;
+                    }
                 }
             }
+
+            if (sector == null)
+                if(Main.cfgDebug.Value) Main.log.LogInfo("No buy location nearby to fill demand for " + item.itemName + " (" + item.id + ") in sector " + closeToSector.coords + " in range: " + maxRange + " lower than level: " + maxSectorLevel);
+
             return new Tuple<TSector, float>(sector, finalLowestSellingPrice);
         }
 
@@ -194,6 +207,36 @@ namespace MC_SVTraderItemReserve
         internal static float GetBuyingPrice(ItemMarketPrice item, TSector sector)
         {
             return item.buyingPrice == -1 ? (item.tradePrice == -1 ? GameData.data.GalacticMarket().GetItemPriceOnSector(item.AsItem.id, sector) : item.tradePrice) : item.buyingPrice;
+        }
+
+        internal static Station GetStationBuyingItem(TSector sector, Item item, int factionID, int qntTarget, out float unitPrice)
+        {
+            if (factionID == -2)
+            {
+                factionID = sector.factionControl;
+            }
+            Station station = null;
+            float num = -1f;
+            for (int i = 0; i < sector.stationIDs.Count; i++)
+            {
+                Station station2 = GameData.GetStation(sector.stationIDs[i], allowDestroyedOrWrecked: false);
+                if (station2 != null && (station2.factionIndex == factionID || factionID == -1))
+                {
+                    float marketPriceForItem = station2.GetMarketPriceForItem(item, 1, out int buyingQnt);
+                    if (marketPriceForItem != -1f && marketPriceForItem > num && buyingQnt > (Mathf.CeilToInt(qntTarget * (Main.cfgSellQntTarget.Value / 100))))
+                    {
+                        num = marketPriceForItem;
+                        station = station2;
+                    }
+                }
+            }
+            if (station != null)
+            {
+                unitPrice = num;
+                return station;
+            }
+            unitPrice = -1f;
+            return null;
         }
     }
 }
