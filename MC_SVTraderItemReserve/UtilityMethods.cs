@@ -156,7 +156,7 @@ namespace MC_SVTraderItemReserve
             return new Tuple<TSector, float>(sector, finalHighestBuyingPrice);
         }
 
-        internal static Tuple<TSector, float> GetLowestAvailableNearbySellingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float lowerThanValue)
+        internal static Tuple<TSector, float> GetLowestAvailableNearbySellingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float lowerThanValue, TSector demandingSector)
         {
             int minLvl = 0;
             int maxLvl = baseLevel + 2;
@@ -194,7 +194,7 @@ namespace MC_SVTraderItemReserve
             }
 
             if (sector == null)
-                if(Main.cfgDebug.Value) Main.log.LogInfo("No buy location nearby to fill demand for " + item.itemName + " (" + item.id + ") in sector " + closeToSector.coords + " in range: " + maxRange + " <= level: " + maxSectorLevel);
+                if(Main.cfgDebug.Value) Main.log.LogInfo("No buy location nearby to fill demand for " + item.itemName + " (" + item.id + ") in sector " + demandingSector.coords + " in range: " + maxRange + " <= level: " + maxSectorLevel + " trader location (search source): " + closeToSector.coords);
 
             return new Tuple<TSector, float>(sector, finalLowestSellingPrice);
         }

@@ -184,11 +184,11 @@ namespace MC_SVTraderItemReserve
                 else
                 {
                     __instance.wantsToBuyItem = null;
-                    Main.ClearBuyReservations(__instance, "Null selling station in target sector.");
+                    Main.ClearBuyReservations(__instance, "Null selling station in target sector (background).");
                     lock (Main.listLock)
                     {
                         if (Main.sellTargets.TryGetValue(__instance.id, out _))
-                            Main.ClearSellTargets(__instance, "Null selling station in target sector.");
+                            Main.ClearSellTargets(__instance, "Null selling station in target sector (background).");
                     }
                 }
 
@@ -256,7 +256,7 @@ namespace MC_SVTraderItemReserve
                     {
                         foreach (ItemMarketPrice zeroStockItem in zeroStockItems)
                         {
-                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector));
+                            Tuple<TSector, float> buyLoc = UtilityMethods.GetLowestAvailableNearbySellingPriceForItem(zeroStockItem.AsItem, commerceLevel, Mathf.RoundToInt((dynChar.MaxWarpDistance * (Main.cfgRandomWarpTries.Value * 0.75f))), fromSector, maxSectorLevel, UtilityMethods.GetBuyingPrice(zeroStockItem, zeroStockItem.mpc.sector), zeroStockItem.mpc.sector);
                             if (buyLoc.Item1 != null)
                             {
                                 int maxQnt = Mathf.Clamp((int)(dynChar.credits / buyLoc.Item2), 0, (int)(dynChar.CargoSpace / zeroStockItem.AsItem.weight));

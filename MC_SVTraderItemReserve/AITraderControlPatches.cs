@@ -92,20 +92,20 @@ namespace MC_SVTraderItemReserve
                             }
                         }
 
-                        station = currentSector.GetStationSellingItem(__instance.dynChar.wantsToBuyItem, -1, 10, out var _);
+                        station = currentSector.GetStationSellingItem(__instance.dynChar.wantsToBuyItem, -1, 1, out var _);
                         if (station == null)
                         {
                             __instance.WarpDisappear(true);
                             __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10, 10);
                             __instance.dynChar.wantsToBuyItem = null;
 
-                            Main.ClearBuyReservations(__instance.dynChar, "Null selling station in target sector.");
+                            Main.ClearBuyReservations(__instance.dynChar, "Null selling station in target sector (local).");
 
                             lock (Main.listLock)
                             {
                                 if (Main.sellTargets.TryGetValue(__instance.dynChar.id, out _))
                                 {
-                                    Main.ClearSellTargets(__instance.dynChar, "Null selling station in target sector.");
+                                    Main.ClearSellTargets(__instance.dynChar, "Null selling station in target sector (local).");
                                 }
                             }
                             return false;
