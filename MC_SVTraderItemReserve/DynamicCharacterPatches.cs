@@ -33,14 +33,17 @@ namespace MC_SVTraderItemReserve
         [HarmonyPrefix]
         private static bool DynamicCharacterUpdate_Pre(DynamicCharacter __instance)
         {
+            // This is a kludge.  Ended up with a trader in sector -1 and I don't know why.
+            // Could be a bug here somewhere, could be because I wasn't clearing buy/sell lists between quit/loads, could be an old issue I had and fixed without knowing.  Just don't know.
             if (__instance.currSectorID < 0 || __instance.currSectorID >= GameData.data.sectors.Count)
             {
                 if (Main.cfgDebug.Value) Main.log.LogError("Trader: " + __instance.name + " (" + __instance.id + ") in invalid sector: " + __instance.currSectorID + ".  Setting to 0.");
                 __instance.currSectorID = 0;
                 Main.ClearBuyReservations(__instance, "Invalid current sector");
-                }
-
-                if (__instance.Sector.IsBeingAttacked)
+            }
+            // end of kludge.
+            
+            if (__instance.Sector.IsBeingAttacked)
             {
                 __instance.GoToRandomSector(__instance.level + 5, 0);
                 return false;
