@@ -19,7 +19,9 @@ namespace MC_SVTraderItemReserve
                 ___stayAtDestinationTurns--;
                 return false;
             }
+
             TSector currentSector = GameData.data.GetCurrentSector();
+
             if (__instance.currStatus == 0)
             {
                 __instance.goingToStation = null;
@@ -47,7 +49,9 @@ namespace MC_SVTraderItemReserve
                                 return false;
                             }
                         }
+
                         station = currentSector.GetStationBuyingItem(stockDataByIndex.AsItem, -1, out var _);
+
                         if (station == null)
                         {
                             if (Main.sellTargets.TryGetValue(__instance.dynChar.id, out TSector sellTargetsector))
@@ -69,6 +73,7 @@ namespace MC_SVTraderItemReserve
 
                         __instance.dynChar.wantsToBuyItem = Main.GetRandomItemToBuy(__instance.dynChar, currentSector.MarketPriceControl(), __instance.dynChar.CommerceLevel, 5);
                     }
+
                     if (__instance.dynChar.wantsToBuyItem != null)
                     {
                         lock (Main.listLock)

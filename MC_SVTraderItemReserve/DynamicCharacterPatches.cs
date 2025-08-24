@@ -65,10 +65,11 @@ namespace MC_SVTraderItemReserve
                 int qntTarget = stockDataByIndex.stock;
                 lock (Main.listLock)
                 {
-                    if (Main.sellTargets.TryGetValue(__instance.id, out _))
-                        qntTarget = 1;
+                    TSector targetSector = null;
+                    if (Main.sellTargets.TryGetValue(__instance.id, out targetSector))
+                        qntTarget = 1; // If trader has a sell target, it's supplying and will supply any qnt.
 
-                    if (Main.sellTargets.TryGetValue(__instance.id, out TSector targetSector) && targetSector != __instance.Sector)
+                    if (targetSector != null && targetSector != __instance.Sector)
                     {
                         if (targetSector.IsBeingAttacked)
                         {
@@ -90,22 +91,24 @@ namespace MC_SVTraderItemReserve
                         float higherThanValue = ((__instance.failedAttempts < Main.cfgRandomWarpTries.Value) ? __instance.lastUnitPricePaid : 0f);
                         if (higherThanValue == 0)
                             if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Failed " + Main.cfgRandomWarpTries.Value + " attempts, setting target value to 0 and randomly warping.");
+
                         TSector nearbySectorWithHighestBuyingPrice = UtilityMethods.GetHighestNearbyBuyingPriceForItem(stockDataByIndex.AsItem, __instance.level, __instance.MaxWarpDistance, __instance.Sector, __instance.level + 5, higherThanValue, qntTarget).Item1;
+                        
                         if (nearbySectorWithHighestBuyingPrice == null)
                         {
                             __instance.failedAttempts++;
                             __instance.GoToRandomSector(__instance.level + 5, 10);
                             return false;
-                        }
-                        if (nearbySectorWithHighestBuyingPrice != __instance.Sector)
+                        }                        
+                        else if (nearbySectorWithHighestBuyingPrice != __instance.Sector)
                         {
                             if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") - Found nearby sector, going to: " + nearbySectorWithHighestBuyingPrice.coords);
                             __instance.GoToSector(nearbySectorWithHighestBuyingPrice);
-                            return false;
                         }
                     }
 
                     Station stationBuyingItem = UtilityMethods.GetStationBuyingItem(__instance.Sector, stockDataByIndex.AsItem, -1, qntTarget, out _);
+                    
                     if (stationBuyingItem != null)
                     {
                         if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") found station in sector.");
@@ -177,7 +180,7 @@ namespace MC_SVTraderItemReserve
                 Station stationSellingItem = __instance.Sector.GetStationSellingItem(__instance.wantsToBuyItem, -1, 1, out float unitPrice2);
                 if (stationSellingItem != null)
                 {
-                    int maxQnt = Mathf.Clamp((int)(__instance.credits / unitPrice2), 0, (int)((float)__instance.CargoSpace / __instance.wantsToBuyItem.weight));
+                    int maxQnt = Mathf.FloorToInt(Mathf.Clamp((int)(__instance.credits / unitPrice2), 0, (int)((float)__instance.CargoSpace / __instance.wantsToBuyItem.weight)));
                     if (__instance.BuyItemFromStation(stationSellingItem, __instance.wantsToBuyItem, maxQnt))
                     {
                         __instance.wantsToBuyItem = null;

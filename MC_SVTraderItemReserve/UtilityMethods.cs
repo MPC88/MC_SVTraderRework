@@ -57,8 +57,8 @@ namespace MC_SVTraderItemReserve
             {
                 foreach (ItemMarketPrice imp in list)
                 {
-                    BuyReservation re = BuyReservation.EntryExists(Main.buyReservations, sector.Index, imp.itemID);
-                    if (re == null)
+                    int totalReservedQnt = BuyReservation.GetTotalReservedQuantity(Main.buyReservations, imp.itemID, sector.Index);
+                    if (totalReservedQnt == 0)
                     {
                         Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out _);
                         if (station != null)
@@ -69,22 +69,15 @@ namespace MC_SVTraderItemReserve
                         Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out _);
                         if (station != null)
                         {
-                            SM_Market market = station.MarketModule;
-                            if (market != null)
-                            {
-                                int availableQnt = market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, imp.itemID, sector.Index);
+                            float unitPrice =  station.GetMarketPriceForItem(imp.AsItem, 0, out int curStock);
 
-                                float unitPrice = GetSellingPrice(imp, sector);
+                            int availableQnt = curStock - totalReservedQnt;
+                            int desiredQnt = Mathf.FloorToInt(Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight)));
 
-                                int desiredQnt = Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight));
-
-                                if (desiredQnt <= availableQnt)
-                                    newList.Add(imp);
-                                else if (Main.cfgDebug.Value)
-                                    Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to insufficent stock: " + availableQnt + " (desired: " + desiredQnt + ")");
-                            }
+                            if (desiredQnt <= availableQnt)
+                                newList.Add(imp);
                             else if (Main.cfgDebug.Value)
-                                Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL MARKET MODULE");
+                                Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to insufficent stock: " + availableQnt + " (desired: " + desiredQnt + ")");
                         }
                         else if (Main.cfgDebug.Value)
                             Main.log.LogInfo("Item: " + ItemDB.GetItem(imp.itemID).itemName + " (" + imp.itemID + ")" + " in sector: " + sector.coords + " blocked due to NULL STATION");
@@ -177,10 +170,10 @@ namespace MC_SVTraderItemReserve
                             if (station != null)
                             {
                                 float marketPriceForItem = station.GetMarketPriceForItem(item, 0, out int curStock);
+                                int totalReservedQnt = BuyReservation.GetTotalReservedQuantity(Main.buyReservations, item.id, s.Index);
+                                int availableQnt = curStock - totalReservedQnt;
 
-                                int availableStock = station.GetItemStationStock(item) - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, item.id, s.Index);
-
-                                if (marketPriceForItem != -1f && marketPriceForItem < finalLowestSellingPrice && availableStock > 0)
+                                if (marketPriceForItem != -1f && marketPriceForItem < finalLowestSellingPrice && availableQnt > Main.cfgMinSupplyQuantity.Value)
                                 {
                                     finalLowestSellingPrice = marketPriceForItem;
                                     sector = s;

@@ -24,6 +24,7 @@ namespace MC_SVTraderItemReserve
         public static ConfigEntry<int> cfgMaxSuppliersPerSector;
         public static ConfigEntry<float> cfgMinSectorLevelSupplying;
         public static ConfigEntry<float> cfgMinSectorLevelBuying;
+        public static ConfigEntry<int> cfgMinSupplyQuantity;
         internal static object listLock = new object();
         internal static List<BuyReservation> buyReservations = new List<BuyReservation>();
         internal static Dictionary<int, TSector> sellTargets = new Dictionary<int, TSector>();
@@ -73,7 +74,13 @@ namespace MC_SVTraderItemReserve
                 "Minimum buying sector level",
                 2,
                 "The minimum sector level in which a trader will search for goods to buy.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher minimum sector level (after division) can improve performance.");
-            
+
+            cfgMinSupplyQuantity = Config.Bind<int>(
+                "Buying",
+                "Minimum supply quantity to buy",
+                50,
+                "The minimum quantity that must be available for purchase when looking for a location to buy an item to supply a station.  The default is 10x the threshold for considering a station to be 'out of stock' (5)");
+
             cfgDebug = Config.Bind<bool>(
                 "Debug",
                 "Debug",

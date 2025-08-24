@@ -17,15 +17,6 @@ namespace MC_SVTraderItemReserve
             this.qnt = qty;
         }
 
-        internal static BuyReservation EntryExists(List<BuyReservation> list, int sectorIndex, int itemID)
-        {
-            foreach (BuyReservation entry in list)
-                if (entry.sectorIndex == sectorIndex && entry.itemID == itemID)
-                    return entry;
-
-            return null;
-        }
-
         internal static int GetTotalReservedQuantity(List<BuyReservation> list, int itemID, int sectorIndex)
         {
             int qnt = 0;
