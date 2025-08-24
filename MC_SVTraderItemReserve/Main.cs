@@ -21,6 +21,9 @@ namespace MC_SVTraderItemReserve
         public static ConfigEntry<int> cfgInsufficientStockLimit;
         public static ConfigEntry<float> cfgSellQntTarget;
         public static ConfigEntry<int> cfgRandomWarpTries;
+        public static ConfigEntry<int> cfgMaxSuppliersPerSector;
+        public static ConfigEntry<float> cfgMinSectorLevelSupplying;
+        public static ConfigEntry<float> cfgMinSectorLevelBuying;
         internal static object listLock = new object();
         internal static List<BuyReservation> buyReservations = new List<BuyReservation>();
         internal static Dictionary<int, TSector> sellTargets = new Dictionary<int, TSector>();
@@ -47,17 +50,41 @@ namespace MC_SVTraderItemReserve
                 4,
                 "When searching for sell location, the number of random warps a trader makes before setting their target sell unit price to 0.");
 
+            cfgMaxSuppliersPerSector = Config.Bind<int>(
+                "Selling",
+                "Max suppliers per sector",
+                10,
+                "Maximum number of traders who will supply any station in a given sector.");
+
             cfgInsufficientStockLimit = Config.Bind<int>(
                 "Buying",
                 "Insufficient stock limit",
                 5,
                 "The stock level where a trader will attempt to supply a producer.");
 
+            cfgMinSectorLevelSupplying = Config.Bind<float>(
+                "Buying",
+                "Minimum supply sector level",
+                1,
+                "The minimum sector level in which a trader will search for stations in need to supply.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will sarch in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher final minimum sector level (after division) can improve performance.");
+            
+            cfgMinSectorLevelBuying = Config.Bind<float>(
+                "Buying",
+                "Minimum buying sector level",
+                2,
+                "The minimum sector level in which a trader will search for goods to buy.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher minimum sector level (after division) can improve performance.");
+            
             cfgDebug = Config.Bind<bool>(
                 "Debug",
                 "Debug",
                 false,
                 "Log debug messages");
+        }
+
+        public void Start()
+        {
+            if (cfgMinSectorLevelBuying.Value < 1) cfgMinSectorLevelBuying.Value = 1f;
+            if (cfgMinSectorLevelSupplying.Value < 1) cfgMinSectorLevelSupplying.Value = 1f;
         }
 
         public void Update()

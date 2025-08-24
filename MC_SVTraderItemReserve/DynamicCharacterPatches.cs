@@ -236,7 +236,8 @@ namespace MC_SVTraderItemReserve
             ItemMarketPrice finalItem = null;
             Dictionary<ItemMarketPrice, BuyReservation> zeroStockBuyLocs = new Dictionary<ItemMarketPrice, BuyReservation>();
             int maxLvl = commerceLevel + 2;
-            int minLvl = 0;
+            int minLvl = Main.cfgMinSectorLevelSupplying.Value <= 1 ? 1 : Mathf.FloorToInt(maxLvl / Main.cfgMinSectorLevelSupplying.Value);
+            if (minLvl < 1) minLvl = 1;
             while (finalItem == null && maxLvl <= maxSectorLevel)
             {
                 zeroStockBuyLocs.Clear();
@@ -247,7 +248,11 @@ namespace MC_SVTraderItemReserve
                 {
                     foreach (TSector s in sectorList)
                     {
-                        ItemMarketPrice zeroStockItem = GetRandomInsufficientStockItemInSector(s, minLvl - 2, maxLvl + 2);
+                        if (Main.sellTargets.Values.ToList().FindAll(sellSector => sellSector.Index == s.Index).Count >= Main.cfgMaxSuppliersPerSector.Value)
+                            continue;
+
+                        int min = minLvl >= 2 ? minLvl - 2 : 1;
+                        ItemMarketPrice zeroStockItem = GetRandomInsufficientStockItemInSector(s, min, maxLvl + 2);
                         if (zeroStockItem != null)
                             zeroStockItems.Add(zeroStockItem);
                     }
@@ -318,7 +323,8 @@ namespace MC_SVTraderItemReserve
 
             Tuple<ItemMarketPrice, int> finalResult = null;
             int maxLvl = commerceLevel + 2;
-            int minLvl = Mathf.RoundToInt(maxLvl / 2);
+            int minLvl = Main.cfgMinSectorLevelBuying.Value <= 1 ? 1 : Mathf.FloorToInt(maxLvl / Main.cfgMinSectorLevelBuying.Value);
+            if (minLvl < 1) minLvl = 1;
             while (finalResult == null && maxLvl <= maxSectorLevel)
             {
                 List<TSector> list = GameData.data.sectors.FindAll((TSector s) => s.level >= minLvl && s.level <= maxLvl && !s.IsBeingAttacked && s.DistanceToPositionInGalaxy(fromSector.posV2) <= maxRange && s.MarketPriceControl().HasAnyItemOffer(minLvl - 2, maxLvl + 2));
@@ -328,7 +334,8 @@ namespace MC_SVTraderItemReserve
                 {
                     foreach (TSector s in list)
                     {
-                        Tuple<ItemMarketPrice, int> bestSectorItem = GetBestItemOfferInSector(dynCharID, s.MarketPriceControl(), minLvl - 2, maxLvl + 2);
+                        int min = minLvl >= 2 ? minLvl : 0;
+                        Tuple<ItemMarketPrice, int> bestSectorItem = GetBestItemOfferInSector(dynCharID, s.MarketPriceControl(), min, maxLvl + 2);
                         if (bestSectorItem != null)
                             bestItemOffers.Add(bestSectorItem);
                     }

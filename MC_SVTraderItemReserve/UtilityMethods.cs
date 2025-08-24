@@ -122,9 +122,10 @@ namespace MC_SVTraderItemReserve
         }
 
         internal static Tuple<TSector, float> GetHighestNearbyBuyingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float higherThanValue, int qntTarget)
-        {
-            int minLvl = 0;
+        {            
             int maxLvl = baseLevel + 2;
+            int minLvl = Main.cfgMinSectorLevelBuying.Value <= 1 ? 1 : Mathf.FloorToInt(maxLvl / Main.cfgMinSectorLevelBuying.Value);
+            if (minLvl < 1) minLvl = 1;
             float finalHighestBuyingPrice = 0f;
             TSector sector = null;
             while (finalHighestBuyingPrice == 0 && maxLvl <= maxSectorLevel)
@@ -158,8 +159,9 @@ namespace MC_SVTraderItemReserve
 
         internal static Tuple<TSector, float> GetLowestAvailableNearbySellingPriceForItem(Item item, int baseLevel, float maxRange, TSector closeToSector, int maxSectorLevel, float lowerThanValue, TSector demandingSector)
         {
-            int minLvl = 0;
             int maxLvl = baseLevel + 2;
+            int minLvl = Main.cfgMinSectorLevelSupplying.Value <= 1 ? 1 : Mathf.FloorToInt(maxLvl / Main.cfgMinSectorLevelSupplying.Value);
+            if (minLvl < 1) minLvl = 1;
             float finalLowestSellingPrice = 99999;
             TSector sector = null;
             lock (Main.listLock)
