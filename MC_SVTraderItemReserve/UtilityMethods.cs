@@ -60,13 +60,13 @@ namespace MC_SVTraderItemReserve
                     BuyReservation re = BuyReservation.EntryExists(Main.buyReservations, sector.Index, imp.itemID);
                     if (re == null)
                     {
-                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out float _);
+                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 10, out _);
                         if (station != null)
                             newList.Add(imp);
                     }
                     else
                     {
-                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out float unitPrice);
+                        Station station = sector.GetStationSellingItem(imp.AsItem, -1, 1, out _);
                         if (station != null)
                         {
                             SM_Market market = station.MarketModule;
@@ -74,7 +74,7 @@ namespace MC_SVTraderItemReserve
                             {
                                 int availableQnt = market.GetMarketItem(3, imp.itemID, imp.AsItem.rarity, null).Stock - BuyReservation.GetTotalReservedQuantity(Main.buyReservations, imp.itemID, sector.Index);
 
-                                unitPrice = GetSellingPrice(imp, sector);
+                                float unitPrice = GetSellingPrice(imp, sector);
 
                                 int desiredQnt = Mathf.Clamp((int)(dynChar.credits / unitPrice), 0, (int)(dynChar.CargoSpace / imp.AsItem.weight));
 
