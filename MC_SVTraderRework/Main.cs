@@ -25,9 +25,11 @@ namespace MC_SVTraderRework
         public static ConfigEntry<float> cfgMinSectorLevelSupplying;
         public static ConfigEntry<float> cfgMinSectorLevelBuying;
         public static ConfigEntry<int> cfgMinSupplyQuantity;
+
         internal static object listLock = new object();
         internal static List<BuyReservation> buyReservations = new List<BuyReservation>();
         internal static Dictionary<int, TSector> sellTargets = new Dictionary<int, TSector>();
+        internal static bool abortUpdate = false;
 
         // Debug
         public static ConfigEntry<bool> cfgDebug;
@@ -128,6 +130,44 @@ namespace MC_SVTraderRework
                     log.LogWarning("------------------------------------------------------------------------------------------");
                 }
             }
+        }
+
+        [HarmonyPatch(typeof(CharacterSystem), nameof(CharacterSystem.UpdateCharacters))]
+        [HarmonyPrefix]
+        private static bool CharSysUpdate_Pre(CharacterSystem __instance, bool forced)
+        {
+            if (!forced && GameData.timePlayed - __instance.timeCountOnLastUpdate < 30f)
+            {
+                return false;
+            }
+
+            if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
+
+            foreach (DynamicCharacter dynChar in __instance.dynChars)
+            {
+                dynChar.UpdateCharacter();
+
+                if(Main.abortUpdate)
+                {
+                    if (Main.cfgDebug.Value) Main.log.LogInfo("UPDATING TRADERS - ABORTED FOR SAVE");
+                    Main.abortUpdate = false;
+                    break;
+                }
+            }
+
+            if (Main.cfgDebug.Value) Main.log.LogInfo("------------------------------------------------ UPDATING TRADERS END ------------------------------------------------");
+
+            __instance.timeCountOnLastUpdate = GameData.timePlayed;
+
+            return false;
+        }
+
+        [HarmonyPatch(typeof(GameData), nameof(GameData.SaveGame))]
+        [HarmonyPrefix]
+        private static void GameDataSaveGame_Pre()
+        {
+            //Abort trader update loop on save
+            Main.abortUpdate = true;
         }
 
         [HarmonyPatch(typeof(MenuControl), nameof(MenuControl.LoadGame))]

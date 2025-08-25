@@ -8,27 +8,6 @@ namespace MC_SVTraderRework
 {
     internal class DynamicCharacterPatches
     {
-        [HarmonyPatch(typeof(CharacterSystem), nameof(CharacterSystem.UpdateCharacters))]
-        [HarmonyPrefix]
-        private static void CharacterSystemUpdate_Pre(CharacterSystem __instance, bool forced, out bool __state)
-        {
-            if (forced || GameData.timePlayed - __instance.timeCountOnLastUpdate >= 30f)
-            {
-                if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
-                __state = true;
-            }
-
-            __state = false;
-        }
-
-        [HarmonyPatch(typeof(CharacterSystem), nameof(CharacterSystem.UpdateCharacters))]
-        [HarmonyPostfix]
-        private static void CharacterSystemUpdate_Post(bool __state)
-        {
-            if (__state)
-                if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
-        }
-
         [HarmonyPatch(typeof(DynamicCharacter), nameof(DynamicCharacter.UpdateCharacter))]
         [HarmonyPrefix]
         private static bool DynamicCharacterUpdate_Pre(DynamicCharacter __instance)
