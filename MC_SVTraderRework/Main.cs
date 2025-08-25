@@ -13,8 +13,8 @@ namespace MC_SVTraderRework
     public class Main : BaseUnityPlugin
     {
         // BepInEx
-        public const string pluginGuid = "mc.starvalor.traderitemreserve";
-        public const string pluginName = "SV Trader Item Reserve";
+        public const string pluginGuid = "mc.starvalor.traderrework";
+        public const string pluginName = "SV Trader Rework";
         public const string pluginVersion = "0.0.1";
 
         // Mod
