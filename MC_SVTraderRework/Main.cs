@@ -144,6 +144,9 @@ namespace MC_SVTraderRework
 
             if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
 
+            // Reset flag if set, we're not in an update loop, nothing to abort.  Likely a save made between updates.
+            if(Main.abortUpdate) Main.abortUpdate = false;
+
             foreach (DynamicCharacter dynChar in __instance.dynChars)
             {
                 dynChar.UpdateCharacter();
