@@ -13,7 +13,7 @@ Install
   
 Use / Configuration  
 =====
-- AI as well as player markets for stopped production lines are prioritized (trigger stock quantity configurable)  
+- AI as well as player markets for stopped production lines are prioritised (trigger stock quantity configurable)  
 - Up to 10 traders will jump on a stopped production line at a time to prevent oversupply (configurable)  
 - Lower level limit removed, all traders retain the ability to transport iron/aluminium/etc (configurable)  
 - Buy items are being reserved - no more 250 traders coming for the same 2 coffee in your station with 249 traders leaving empty  
