@@ -15,7 +15,7 @@ namespace MC_SVTraderRework
         // BepInEx
         public const string pluginGuid = "mc.starvalor.traderrework";
         public const string pluginName = "SV Trader Rework";
-        public const string pluginVersion = "0.0.1";
+        public const string pluginVersion = "1.0.0";
 
         // Mod
         public static ConfigEntry<int> cfgInsufficientStockLimit;
@@ -69,7 +69,7 @@ namespace MC_SVTraderRework
                 "Buying",
                 "Minimum supply sector level",
                 1,
-                "The minimum sector level in which a trader will search for stations in need to supply.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will sarch in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher final minimum sector level (after division) can improve performance.");
+                "The minimum sector level in which a trader will search for stations in need to supply.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher final minimum sector level (after division) can improve performance.");
             
             cfgMinSectorLevelBuying = Config.Bind<float>(
                 "Buying",
