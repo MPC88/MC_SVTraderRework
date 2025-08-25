@@ -41,4 +41,4 @@ Debug:
    
 Credit  
 =====  
-Huge thanks to LadyHawk for the ideas/discussions and, more importantly, all the data analysis and testing I am not capable of performing.  
+Huge thanks to LadyHawk for the ideas/discussions and, more importantly, all the data analysis and testing I am not capable of.  
