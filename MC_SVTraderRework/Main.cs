@@ -62,26 +62,26 @@ namespace MC_SVTraderRework
             cfgInsufficientStockLimit = Config.Bind<int>(
                 "Buying",
                 "Insufficient stock limit",
-                5,
-                "The stock level where a trader will attempt to supply a producer.");
+                6,
+                "The stock level where a trader will attempt to supply a producer.  Min value: 6.");
 
             cfgMinSectorLevelSupplying = Config.Bind<float>(
                 "Buying",
                 "Minimum supply sector level",
                 1,
-                "The minimum sector level in which a trader will search for stations in need to supply.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher final minimum sector level (after division) can improve performance.");
+                "The minimum sector level in which a trader will search for stations in need to supply.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher final minimum sector level (after division) can improve performance.  Min value: 1.");
             
             cfgMinSectorLevelBuying = Config.Bind<float>(
                 "Buying",
                 "Minimum buying sector level",
                 2,
-                "The minimum sector level in which a trader will search for goods to buy.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher minimum sector level (after division) can improve performance.");
+                "The minimum sector level in which a trader will search for goods to buy.  When set to 1, the sector level is 1.  When set to any other value, it is that fraction of the trader's level rounded down e.g. 2 would mean minimum sector level is half the trader's level, so a level 41 trader will search in sectors between 20 and 41 or a level 10 trader between 5 and 10.  Higher minimum sector level (after division) can improve performance.  Min value: 1.");
 
             cfgMinSupplyQuantity = Config.Bind<int>(
                 "Buying",
                 "Minimum supply quantity to buy",
                 50,
-                "The minimum quantity that must be available for purchase when looking for a location to buy an item to supply a station.  The default is 10x the threshold for considering a station to be 'out of stock' (5)");
+                "The minimum quantity that must be available for purchase when looking for a location to buy an item to supply a station.  The default is 10x the threshold for considering a station to be 'out of stock' (5).");
 
             cfgDebug = Config.Bind<bool>(
                 "Debug",
@@ -94,6 +94,7 @@ namespace MC_SVTraderRework
         {
             if (cfgMinSectorLevelBuying.Value < 1) cfgMinSectorLevelBuying.Value = 1f;
             if (cfgMinSectorLevelSupplying.Value < 1) cfgMinSectorLevelSupplying.Value = 1f;
+            if (cfgInsufficientStockLimit.Value < 6) cfgInsufficientStockLimit.Value = 6;
         }
 
         public void Update()
