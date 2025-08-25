@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace MC_SVTraderItemReserve
+namespace MC_SVTraderRework
 {
     internal class BuyReservation
     {

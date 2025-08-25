@@ -7,8 +7,8 @@
     <ProjectGuid>{10C5F443-EECE-47CF-BF43-47AE96565EE4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MC_SVTraderItemReserve</RootNamespace>
-    <AssemblyName>MC_SVTraderItemReserve</AssemblyName>
+    <RootNamespace>MC_SVTraderRework</RootNamespace>
+    <AssemblyName>MC_SVTraderRework</AssemblyName>
     <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

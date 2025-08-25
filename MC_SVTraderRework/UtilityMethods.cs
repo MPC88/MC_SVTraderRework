@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace MC_SVTraderItemReserve
+namespace MC_SVTraderRework
 {
     internal class UtilityMethods
     {
