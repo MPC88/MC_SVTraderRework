@@ -144,9 +144,6 @@ namespace MC_SVTraderRework
 
             if (Main.cfgDebug.Value) Main.log.LogInfo("-------------------------------------------------- UPDATING TRADERS --------------------------------------------------");
 
-            // Reset flag if set, we're not in an update loop, nothing to abort.  Likely a save made between updates.
-            if(Main.abortUpdate) Main.abortUpdate = false;
-
             foreach (DynamicCharacter dynChar in __instance.dynChars)
             {
                 dynChar.UpdateCharacter();
@@ -170,8 +167,16 @@ namespace MC_SVTraderRework
         [HarmonyPrefix]
         private static void GameDataSaveGame_Pre()
         {
-            //Abort trader update loop on save
+            // Abort trader update loop on save
             Main.abortUpdate = true;
+        }
+
+        [HarmonyPatch(typeof(GameData), nameof(GameData.SaveGame))]
+        [HarmonyPostfix]
+        private static void GameDataSaveGame_Post()
+        {
+            // Reset loop abort (if not already)
+            Main.abortUpdate = false;
         }
 
         [HarmonyPatch(typeof(MenuControl), nameof(MenuControl.LoadGame))]
@@ -179,6 +184,7 @@ namespace MC_SVTraderRework
         [HarmonyPostfix]
         private static void MenuControlLoadOrQuit_Post()
         {
+            Main.abortUpdate = false;
             lock(Main.listLock)
             {
                 buyReservations.Clear();
