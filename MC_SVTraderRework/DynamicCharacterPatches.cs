@@ -137,11 +137,9 @@ namespace MC_SVTraderRework
                             {
                                 if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") Target sector under attack.");
                                 Main.ClearBuyReservations(__instance, "Target under attack");
-                                lock (Main.listLock)
-                                {
-                                    if (Main.sellTargets.TryGetValue(__instance.id, out _))
-                                        Main.ClearSellTargets(__instance, "Buy target under attack.");
-                                }
+                                
+                                if (Main.sellTargets.TryGetValue(__instance.id, out _))
+                                    Main.ClearSellTargets(__instance, "Buy target under attack.");
                                 return false;
                             }
 
