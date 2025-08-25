@@ -15,7 +15,7 @@ namespace MC_SVTraderRework
         // BepInEx
         public const string pluginGuid = "mc.starvalor.traderrework";
         public const string pluginName = "SV Trader Rework";
-        public const string pluginVersion = "1.0.0";
+        public const string pluginVersion = "1.0.1";
 
         // Mod
         public static ConfigEntry<int> cfgInsufficientStockLimit;
