@@ -60,7 +60,7 @@ namespace MC_SVTraderRework
                                 Main.sellTargets.Remove(__instance.dynChar.id);
                             }
                             __instance.WarpDisappear(true);
-                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10, 10);
+                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10);
                             return false;
                         }
                     }
@@ -101,7 +101,7 @@ namespace MC_SVTraderRework
                         if (station == null)
                         {
                             __instance.WarpDisappear(true);
-                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10, 10);
+                            __instance.dynChar.GoToRandomSector(__instance.dynChar.level + 10);
                             __instance.dynChar.wantsToBuyItem = null;
 
                             Main.ClearBuyReservations(__instance.dynChar, "Null selling station in target sector (local).");
