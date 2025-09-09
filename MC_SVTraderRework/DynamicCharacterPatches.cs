@@ -24,7 +24,7 @@ namespace MC_SVTraderRework
             
             if (__instance.Sector.IsBeingAttacked)
             {
-                __instance.GoToRandomSector(__instance.level + 5, 0);
+                __instance.GoToRandomSector(0);
                 return false;
             }
 
@@ -32,7 +32,7 @@ namespace MC_SVTraderRework
             {
                 if (!GameManager.instance.CurrentSectorHasAnyStationWithMarket())
                 {
-                    __instance.GoToRandomSector(__instance.level + 5, 0);
+                    __instance.GoToRandomSector(0);
                 }
                 return false;
             }
@@ -76,7 +76,7 @@ namespace MC_SVTraderRework
                         if (nearbySectorWithHighestBuyingPrice == null)
                         {
                             __instance.failedAttempts++;
-                            __instance.GoToRandomSector(__instance.level + 5, 10);
+                            __instance.GoToRandomSector(10);
                             return false;
                         }                        
                         else if (nearbySectorWithHighestBuyingPrice != __instance.Sector)
@@ -97,7 +97,7 @@ namespace MC_SVTraderRework
                     else
                     {
                         if (Main.cfgDebug.Value) Main.log.LogInfo("Trader: " + __instance.name + " (" + __instance.id + ") trying to sell: " + ItemDB.GetItem(stockDataByIndex.itemID).itemName + " (" + stockDataByIndex.itemID + ") failed to find station in setor, randomly warping.");
-                        __instance.GoToRandomSector(__instance.level + 10, 10);
+                        __instance.GoToRandomSector(10);
                     }
                 }
                 return false;
@@ -177,7 +177,7 @@ namespace MC_SVTraderRework
 
                 return false;
             }
-            __instance.GoToRandomSector(__instance.level + 5, 10);
+            __instance.GoToRandomSector(10);
 
             return false;
         }
