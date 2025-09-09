@@ -21,7 +21,7 @@ Use / Configuration
   
 All of this means traders transport a lot more different types of goods, they spread out more, are more efficient, and the vast majority of producers in the galaxy remain active.  
   
-Note that all this means trader update cycles take longer to run, but as it is background work it shouldn't be noticable during gameplay.  
+Note that all this means trader update cycles take longer to run, but as it is background work it shouldn't be noticeable during gameplay.  
   
 After first run, a configuration file mc.starvalor.traderrework.cfg will be created in .\Star Valor\BepInEx\Config\.  This file has several settings to customise trader behaviour.  Entries marked with a * can improve performance if changed:  
   
@@ -41,4 +41,4 @@ Debug:
    
 Credit  
 =====  
-Huge thanks to LadyHawk for the ideas/discussions and, more importantly, all the data analysis and testing I am not capable of performing.  
+Huge thanks to LadyHawk for the ideas/discussions and, more importantly, all the data analysis and testing I am not capable of.  
